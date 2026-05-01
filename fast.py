@@ -7,12 +7,51 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from datetime import datetime
 from config import OUTPUT_DIR, MAX_IDEAS
 from analyzer import _chat, _parse_json, extract_methods, analyze_evolution, generate_ideas, analyze_bottlenecks
+import requests as _req
 
 
 def step(msg):
     print(f"\n{'='*60}")
     print(f"  {msg}")
     print(f"{'='*60}")
+
+
+def _lookup_paper_url(title: str) -> str:
+    """通过 Semantic Scholar 查找论文链接"""
+    try:
+        r = _req.get(
+            "https://api.semanticscholar.org/graph/v1/paper/search",
+            params={"query": title[:100], "limit": 1, "fields": "paperId,externalIds,url"},
+            headers={"Accept": "application/json"},
+            timeout=8
+        )
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            if data:
+                p = data[0]
+                ext = p.get("externalIds", {})
+                arxiv = ext.get("ArXiv")
+                if arxiv:
+                    return f"https://arxiv.org/abs/{arxiv}"
+                doi = ext.get("DOI")
+                if doi:
+                    return f"https://doi.org/{doi}"
+                return p.get("url", "")
+    except Exception:
+        pass
+    return ""
+
+
+def _fill_urls(papers: list) -> list:
+    """为没有 URL 的论文补充链接"""
+    for p in papers:
+        if not p.get("url"):
+            url = _lookup_paper_url(p.get("title", ""))
+            if url:
+                p["url"] = url
+                print(f"    ✓ 找到链接: {p.get('title','')[:40]}... → {url[:50]}")
+            time.sleep(0.3)  # S2 速率控制
+    return papers
 
 
 def deepseek_search_papers(query: str, n: int = 15) -> list:
@@ -122,6 +161,9 @@ def run_fast(query: str):
     for p in papers[:5]:
         print(f"    [{p.get('year','?')}] {p.get('title','')[:55]}... ({p.get('key_method','')})")
 
+    # 补充论文链接
+    print("\n  正在查找论文链接...")
+    papers = _fill_urls(papers)
     # Step 2: 构建演化图
     step("Step 2/4: 构建方法演化图")
     graph_data = deepseek_build_evolution(papers)
