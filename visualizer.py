@@ -69,10 +69,20 @@ def generate_graph_html(methods: list, edges: list, output_path: str) -> str:
         """
         net.add_node(name, label=label, color=color, title=title, size=25)
 
-    # 添加边
+    # 收集已有节点名
+    existing_nodes = {m.get("name", "") for m in methods}
+
+    # 添加边（自动补全缺失节点）
     for e in edges:
         src = e.get("source", "")
         tgt = e.get("target", "")
+        if not src or not tgt:
+            continue
+        # 自动补全缺失节点
+        for node in [src, tgt]:
+            if node and node not in existing_nodes:
+                net.add_node(node, label=node, color="#636e72", title=f"（自动补全）{node}", size=18)
+                existing_nodes.add(node)
         rel = e.get("relation", "")
         color = RELATION_COLORS.get(rel, "#636e72")
         title = f"""
@@ -155,6 +165,18 @@ def _generate_svg_graph(methods: list, edges: list, output_path: str) -> str:
     # SVG 生成
     svg_parts = ['<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">']
     svg_parts.append('<rect width="800" height="600" fill="#0a0a0a"/>')
+
+    # 自动补全缺失节点
+    existing = set(nodes.keys())
+    missing_idx = 0
+    for e in edges:
+        for key in ["source", "target"]:
+            name = e.get(key, "")
+            if name and name not in existing:
+                angle = 2 * math.pi * (len(nodes) + missing_idx) / max(len(nodes) + 1, 1)
+                nodes[name] = {"x": 400 + 200 * math.cos(angle), "y": 300 + 200 * math.sin(angle), "cat": "unknown", "desc": "（自动补全）", "year": "?"}
+                existing.add(name)
+                missing_idx += 1
 
     # 绘制边
     for e in edges:
