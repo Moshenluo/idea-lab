@@ -118,7 +118,11 @@ def run_pipeline(job_id, query):
             f.write(f"# IdeaLab 研究报告\n\n**查询:** {query}\n\n")
             f.write("## 论文基础\n\n")
             for p in papers:
-                f.write(f"- [{p.get('year','?')}] **{p.get('title','')}** — {p.get('key_method','')}\n")
+                link = p.get('url', '')
+                if link:
+                    f.write(f"- [{p.get('year','?')}] **[{p.get('title','')}]({link})** — {p.get('key_method','')}\n")
+                else:
+                    f.write(f"- [{p.get('year','?')}] **{p.get('title','')}** — {p.get('key_method','')}\n")
                 f.write(f"  > {p.get('abstract','')}\n\n")
             f.write("## 方法演化图\n\n```\n")
             targets = set(e.get("target","") for e in edges)

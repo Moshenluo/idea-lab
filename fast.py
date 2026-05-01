@@ -30,14 +30,18 @@ def deepseek_search_papers(query: str, n: int = 15) -> list:
   "abstract": "一句话核心贡献",
   "key_method": "核心方法名",
   "citations_approx": 大约引用数,
-  "venue": "发表venue (如 NeurIPS, ICML, ACL, arXiv)"
+  "venue": "发表venue (如 NeurIPS, ICML, ACL, arXiv)",
+  "url": "论文的 arXiv 链接，格式如 https://arxiv.org/abs/XXXX.XXXXX"
 }}
 
 规则:
 - 按时间排序，从最早的奠基工作到最新进展
 - 覆盖该方向的不同子方向/分支
 - 包含至少一篇综述论文（如有）
-- 只列出真实存在的论文"""
+- 只列出真实存在的论文
+- url 字段必须填写！优先填 arXiv 链接，没有 arXiv 的填 DOI 链接或 venue 链接
+- 如果不确定具体 URL，填写 https://arxiv.org/abs/ 加上你记得的 arXiv ID
+- 示例: "url": "https://arxiv.org/abs/1609.02907" (GCN), "url": "https://arxiv.org/abs/1706.03762" (Transformer)"""
     resp = _chat(prompt, f"研究方向: {query}", temperature=0.3)
     try:
         return _parse_json(resp)

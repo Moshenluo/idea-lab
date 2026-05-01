@@ -49,6 +49,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .paper-item { padding: 12px 0; border-bottom: 1px solid #1a1a2e; }
 .paper-item:last-child { border-bottom: none; }
 .paper-title { font-size: 14px; color: #e0e0e0; font-weight: 500; }
+.paper-title a { color: #6c5ce7; text-decoration: none; }
+.paper-title a:hover { text-decoration: underline; }
 .paper-meta { font-size: 12px; color: #666; margin-top: 4px; }
 .paper-abstract { font-size: 13px; color: #888; margin-top: 4px; line-height: 1.5; }
 
@@ -243,13 +245,17 @@ function showResults(data) {
   document.getElementById('results').classList.add('active');
 
   // Papers
-  const papersHtml = (data.papers || []).map(p => `
+  const papersHtml = (data.papers || []).map(p => {
+    const titleHtml = p.url
+      ? `<a href="${esc(p.url)}" target="_blank">${esc(p.title || '')}</a>`
+      : esc(p.title || '');
+    return `
     <div class="paper-item">
-      <div class="paper-title">[${p.year || '?'}] ${esc(p.title || '')}</div>
-      <div class="paper-meta">${esc(p.key_method || '')} · ${esc(p.venue || '')} · ~${p.citations_approx || 0} 引用</div>
+      <div class="paper-title">[${p.year || '?'}] ${titleHtml}</div>
+      <div class="paper-meta">${esc(p.key_method || '')} · ${esc(p.venue || '')} · ~${p.citations_approx || 0} 引用${p.url ? ' · <a href="' + esc(p.url) + '" target="_blank" style="color:#6c5ce7">🔗 链接</a>' : ''}</div>
       <div class="paper-abstract">${esc(p.abstract || '')}</div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
   document.getElementById('papers-list').innerHTML = papersHtml || '<p style="color:#555">无数据</p>';
 
   // Methods
