@@ -86,14 +86,46 @@ def generate_graph_html(methods: list, edges: list, output_path: str) -> str:
     # 生成 HTML
     html = net.generate_html()
 
-    # 注入自定义样式
+    # 注入自定义样式 + 图例
     custom_style = """
     <style>
     body { background: #0a0a0a !important; margin: 0; padding: 0; }
     #mynetwork { border-radius: 12px; border: 1px solid #222; }
+    .legend { position: fixed; bottom: 16px; left: 16px; background: rgba(17,17,24,0.95); border: 1px solid #333; border-radius: 10px; padding: 14px 18px; z-index: 999; font-family: -apple-system, sans-serif; font-size: 12px; color: #ccc; backdrop-filter: blur(8px); }
+    .legend h4 { color: #fff; font-size: 13px; margin: 0 0 10px 0; }
+    .legend-section { margin-bottom: 10px; }
+    .legend-section:last-child { margin-bottom: 0; }
+    .legend-section .title { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .legend-line { width: 20px; height: 3px; border-radius: 2px; flex-shrink: 0; }
     </style>
     """
+    legend_html = """
+    <div class="legend">
+      <h4>📊 图谱说明</h4>
+      <div class="legend-section">
+        <div class="title">节点 = 方法类别</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#6c5ce7"></span> architecture (架构)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#00b894"></span> training (训练)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#e17055"></span> optimization (优化)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#fdcb6e"></span> data (数据)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#74b9ff"></span> evaluation (评估)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#a29bfe"></span> pretraining (预训练)</div>
+      </div>
+      <div class="legend-section">
+        <div class="title">连线 = 演化关系</div>
+        <div class="legend-item"><span class="legend-line" style="background:#6c5ce7"></span> extends (扩展)</div>
+        <div class="legend-item"><span class="legend-line" style="background:#00b894"></span> improves (改进)</div>
+        <div class="legend-item"><span class="legend-line" style="background:#e74c3c"></span> replaces (替代)</div>
+        <div class="legend-item"><span class="legend-line" style="background:#fdcb6e"></span> adapts (适配)</div>
+        <div class="legend-item"><span class="legend-line" style="background:#74b9ff"></span> uses_component (组合)</div>
+      </div>
+      <div style="color:#555;font-size:10px;margin-top:8px">💡 悬停节点/连线查看详情 · 拖拽移动 · 滚轮缩放</div>
+    </div>
+    """
     html = html.replace("<head>", f"<head>{custom_style}")
+    html = html.replace("</body>", f"{legend_html}</body>")
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
@@ -144,13 +176,30 @@ def _generate_svg_graph(methods: list, edges: list, output_path: str) -> str:
 
     svg_parts.append('</svg>')
 
+    legend = """
+    <div style="position:fixed;bottom:16px;left:16px;background:rgba(17,17,24,0.95);border:1px solid #333;border-radius:10px;padding:14px 18px;font-family:-apple-system,sans-serif;font-size:12px;color:#ccc">
+      <div style="color:#fff;font-size:13px;margin-bottom:10px">📊 图谱说明</div>
+      <div style="margin-bottom:8px;color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px">节点 = 方法类别</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:12px;height:12px;border-radius:50%;background:#6c5ce7;display:inline-block"></span> architecture (架构)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:12px;height:12px;border-radius:50%;background:#00b894;display:inline-block"></span> training (训练)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:12px;height:12px;border-radius:50%;background:#e17055;display:inline-block"></span> optimization (优化)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:12px;height:12px;border-radius:50%;background:#fdcb6e;display:inline-block"></span> data (数据)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:12px;height:12px;border-radius:50%;background:#74b9ff;display:inline-block"></span> evaluation (评估)</div>
+      <div style="margin-top:8px;color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px">连线 = 演化关系</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:20px;height:3px;border-radius:2px;background:#6c5ce7;display:inline-block"></span> extends (扩展)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:20px;height:3px;border-radius:2px;background:#00b894;display:inline-block"></span> improves (改进)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:20px;height:3px;border-radius:2px;background:#e74c3c;display:inline-block"></span> replaces (替代)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:20px;height:3px;border-radius:2px;background:#fdcb6e;display:inline-block"></span> adapts (适配)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:20px;height:3px;border-radius:2px;background:#74b9ff;display:inline-block"></span> uses_component (组合)</div>
+    </div>"""
+
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>IdeaLab 方法演化图</title>
 <style>
 body {{ background: #0a0a0a; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }}
 svg {{ max-width: 100%; height: auto; border-radius: 12px; border: 1px solid #222; }}
 </style></head>
-<body>{"".join(svg_parts)}</body></html>"""
+<body>{"".join(svg_parts)}{legend}</body></html>"""
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
