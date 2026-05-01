@@ -16,6 +16,15 @@ def step(msg):
     print(f"{'='*60}")
 
 
+def _title_similarity(a: str, b: str) -> float:
+    """计算两个标题的相似度（基于词重叠）"""
+    def normalize(s):
+        return set(re.sub(r'[^a-z0-9 ]', '', s.lower()).split())
+    wa, wb = normalize(a), normalize(b)
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / max(len(wa), len(wb))
+
 def _scholar_search_url(title: str) -> str:
     """生成 Google Scholar 搜索链接（最后兜底）"""
     q = _req.utils.quote(title[:120])
@@ -40,7 +49,21 @@ def _lookup_paper_url(title: str) -> str:
             if r.status_code == 200:
                 data = r.json().get("data", [])
                 if data:
+                    # 验证标题相似度（阈值 0.4）
                     p = data[0]
+                    s2_title = p.get("title", "")
+                    if s2_title and _title_similarity(title, s2_title) < 0.4:
+                        # 标题不匹配，尝试 limit=3 找更合适的
+                        r2 = _req.get(
+                            "https://api.semanticscholar.org/graph/v1/paper/search",
+                            params={"query": title[:100], "limit": 3, "fields": "paperId,externalIds,url,title"},
+                            headers=headers, timeout=8
+                        )
+                        if r2.status_code == 200:
+                            for cand in r2.json().get("data", []):
+                                if _title_similarity(title, cand.get("title", "")) >= 0.4:
+                                    p = cand
+                                    break
                     ext = p.get("externalIds", {})
                     # 优先级: arXiv > DOI > PubMed > ACL > DBLP > S2 URL
                     arxiv = ext.get("ArXiv")
