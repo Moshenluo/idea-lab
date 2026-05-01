@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IdeaLab — AI 研究 Idea 生成器</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
+
+/* Header */
+.header { padding: 24px 0; text-align: center; border-bottom: 1px solid #1a1a2e; background: linear-gradient(180deg, #0f0f1a 0%, #0a0a0a 100%); }
+.header h1 { font-size: 28px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+.header h1 span { color: #6c5ce7; }
+.header p { color: #888; font-size: 14px; margin-top: 6px; }
+
+/* Main container */
+.container { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+
+/* Search box */
+.search-box { background: #111118; border: 1px solid #222; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+.search-box label { display: block; font-size: 13px; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.search-input-wrap { display: flex; gap: 12px; }
+.search-input-wrap input { flex: 1; background: #0a0a0a; border: 1px solid #333; border-radius: 8px; padding: 12px 16px; color: #fff; font-size: 15px; outline: none; transition: border-color 0.2s; }
+.search-input-wrap input:focus { border-color: #6c5ce7; }
+.search-input-wrap input::placeholder { color: #555; }
+.btn { background: linear-gradient(135deg, #6c5ce7, #a855f7); color: #fff; border: none; border-radius: 8px; padding: 12px 28px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(108,92,231,0.4); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Progress */
+.progress-box { background: #111118; border: 1px solid #222; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; display: none; }
+.progress-box.active { display: block; }
+.progress-bar-wrap { background: #1a1a2e; border-radius: 6px; height: 8px; overflow: hidden; margin: 12px 0; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #6c5ce7, #a855f7); border-radius: 6px; transition: width 0.5s ease; width: 0%; }
+.progress-text { font-size: 13px; color: #888; }
+.progress-step { font-size: 14px; color: #ccc; margin-bottom: 4px; }
+
+/* Results */
+.results { display: none; }
+.results.active { display: block; }
+
+/* Section */
+.section { background: #111118; border: 1px solid #222; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+.section-title { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.section-title .icon { font-size: 20px; }
+
+/* Papers */
+.paper-item { padding: 12px 0; border-bottom: 1px solid #1a1a2e; }
+.paper-item:last-child { border-bottom: none; }
+.paper-title { font-size: 14px; color: #e0e0e0; font-weight: 500; }
+.paper-meta { font-size: 12px; color: #666; margin-top: 4px; }
+.paper-abstract { font-size: 13px; color: #888; margin-top: 4px; line-height: 1.5; }
+
+/* Methods */
+.method-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.method-card { background: #0a0a0a; border: 1px solid #222; border-radius: 8px; padding: 14px; transition: border-color 0.2s; }
+.method-card:hover { border-color: #6c5ce7; }
+.method-name { font-size: 14px; font-weight: 600; color: #a855f7; }
+.method-cat { font-size: 11px; color: #666; background: #1a1a2e; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-top: 4px; }
+.method-desc { font-size: 13px; color: #888; margin-top: 8px; line-height: 1.4; }
+
+/* Evolution edges */
+.evo-edge { background: #0a0a0a; border: 1px solid #222; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+.evo-header { font-size: 14px; font-weight: 600; color: #fff; }
+.evo-relation { color: #6c5ce7; font-weight: 400; }
+.evo-detail { font-size: 13px; color: #888; margin-top: 8px; line-height: 1.5; }
+.evo-detail strong { color: #aaa; }
+
+/* Bottlenecks */
+.bottleneck-card { background: #0a0a0a; border-left: 3px solid #e74c3c; border-radius: 0 8px 8px 0; padding: 14px 16px; margin-bottom: 10px; }
+.bottleneck-title { font-size: 14px; font-weight: 600; color: #e74c3c; }
+.bottleneck-detail { font-size: 13px; color: #888; margin-top: 6px; line-height: 1.5; }
+
+/* Ideas */
+.idea-card { background: #0a0a0a; border: 1px solid #222; border-radius: 10px; padding: 20px; margin-bottom: 14px; transition: border-color 0.2s; }
+.idea-card:hover { border-color: #6c5ce7; }
+.idea-title { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 12px; }
+.idea-field { margin-bottom: 10px; }
+.idea-field-label { font-size: 12px; color: #6c5ce7; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.idea-field-text { font-size: 14px; color: #ccc; line-height: 1.6; margin-top: 4px; }
+.idea-scores { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+.idea-score { background: #1a1a2e; padding: 6px 14px; border-radius: 6px; font-size: 13px; }
+.idea-score .label { color: #888; }
+.idea-score .value { color: #a855f7; font-weight: 600; }
+.idea-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.idea-tag { background: #1a1a2e; color: #888; font-size: 11px; padding: 3px 10px; border-radius: 4px; }
+
+/* Empty state */
+.empty { text-align: center; padding: 60px 20px; color: #555; }
+.empty .icon { font-size: 48px; margin-bottom: 12px; }
+.empty p { font-size: 14px; }
+
+/* Footer */
+.footer { text-align: center; padding: 32px; color: #444; font-size: 12px; border-top: 1px solid #1a1a2e; margin-top: 40px; }
+.footer a { color: #6c5ce7; text-decoration: none; }
+
+/* Animations */
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.loading { animation: pulse 1.5s infinite; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .search-input-wrap { flex-direction: column; }
+  .method-grid { grid-template-columns: 1fr; }
+  .idea-scores { flex-direction: column; gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔬 Idea<span>Lab</span></h1>
+  <p>基于方法演化图谱的 AI 研究 Idea 生成器</p>
+</div>
+
+<div class="container">
+  <!-- Search -->
+  <div class="search-box">
+    <label>研究方向</label>
+    <div class="search-input-wrap">
+      <input type="text" id="query" placeholder="例: graph neural network for citation analysis" value="">
+      <button class="btn" id="btn-run" onclick="startRun()">🚀 生成 Idea</button>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-box" id="progress-box">
+    <div class="progress-step" id="progress-step">准备中...</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="progress-text" id="progress-text">0%</div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <!-- Papers -->
+    <div class="section" id="sec-papers">
+      <div class="section-title"><span class="icon">📄</span> 论文基础</div>
+      <div id="papers-list"></div>
+    </div>
+
+    <!-- Methods -->
+    <div class="section" id="sec-methods">
+      <div class="section-title"><span class="icon">🔧</span> 方法实体</div>
+      <div class="method-grid" id="methods-grid"></div>
+    </div>
+
+    <!-- Evolution -->
+    <div class="section" id="sec-evolution">
+      <div class="section-title"><span class="icon">🔗</span> 演化关系</div>
+      <div id="evolution-list"></div>
+    </div>
+
+    <!-- Bottlenecks -->
+    <div class="section" id="sec-bottlenecks">
+      <div class="section-title"><span class="icon">⚠️</span> 瓶颈分析</div>
+      <div id="bottlenecks-list"></div>
+    </div>
+
+    <!-- Ideas -->
+    <div class="section" id="sec-ideas">
+      <div class="section-title"><span class="icon">💡</span> 研究 Idea</div>
+      <div id="ideas-list"></div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty" id="empty-state">
+    <div class="icon">🧪</div>
+    <p>输入研究方向，AI 将自动搜索论文、构建方法演化图谱、生成研究 Idea</p>
+  </div>
+</div>
+
+<div class="footer">
+  IdeaLab — 基于 <a href="https://arxiv.org/abs/2604.28158" target="_blank">Intern-Atlas</a> 思路的轻量实现<br>
+  Powered by Semantic Scholar + DeepSeek
+</div>
+
+<script>
+let currentJobId = null;
+let pollTimer = null;
+
+function startRun() {
+  const query = document.getElementById('query').value.trim();
+  if (!query) { alert('请输入研究方向'); return; }
+
+  // UI 状态
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('progress-box').classList.add('active');
+  document.getElementById('results').classList.remove('active');
+  document.getElementById('empty-state').style.display = 'none';
+  updateProgress('正在启动...', 0);
+
+  fetch('/api/run', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({query: query})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { alert(data.error); resetUI(); return; }
+    currentJobId = data.job_id;
+    pollStatus();
+  })
+  .catch(err => { alert('请求失败: ' + err); resetUI(); });
+}
+
+function pollStatus() {
+  if (!currentJobId) return;
+  fetch('/api/status/' + currentJobId)
+  .then(r => r.json())
+  .then(data => {
+    updateProgress(data.step, data.progress);
+    if (data.status === 'done') {
+      setTimeout(() => showResults(data.result), 500);
+    } else if (data.status === 'error') {
+      alert('出错: ' + data.error);
+      resetUI();
+    } else {
+      pollTimer = setTimeout(pollStatus, 1000);
+    }
+  })
+  .catch(() => { pollTimer = setTimeout(pollStatus, 2000); });
+}
+
+function updateProgress(step, pct) {
+  document.getElementById('progress-step').textContent = step;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = pct + '%';
+}
+
+function resetUI() {
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('progress-box').classList.remove('active');
+  document.getElementById('empty-state').style.display = '';
+}
+
+function showResults(data) {
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('progress-box').classList.remove('active');
+  document.getElementById('results').classList.add('active');
+
+  // Papers
+  const papersHtml = (data.papers || []).map(p => `
+    <div class="paper-item">
+      <div class="paper-title">[${p.year || '?'}] ${esc(p.title || '')}</div>
+      <div class="paper-meta">${esc(p.key_method || '')} · ${esc(p.venue || '')} · ~${p.citations_approx || 0} 引用</div>
+      <div class="paper-abstract">${esc(p.abstract || '')}</div>
+    </div>
+  `).join('');
+  document.getElementById('papers-list').innerHTML = papersHtml || '<p style="color:#555">无数据</p>';
+
+  // Methods
+  const methodsHtml = (data.methods || []).map(m => `
+    <div class="method-card">
+      <div class="method-name">${esc(m.name || '')}</div>
+      <div class="method-cat">${esc(m.category || '')} · ${esc(String(m.year || ''))}</div>
+      <div class="method-desc">${esc(m.description || '')}</div>
+    </div>
+  `).join('');
+  document.getElementById('methods-grid').innerHTML = methodsHtml || '<p style="color:#555">无数据</p>';
+
+  // Evolution
+  const evoHtml = (data.evolution_edges || []).map(e => `
+    <div class="evo-edge">
+      <div class="evo-header">${esc(e.source || '')} → <span class="evo-relation">[${esc(e.relation || '')}]</span> → ${esc(e.target || '')}</div>
+      <div class="evo-detail">
+        <strong>瓶颈:</strong> ${esc(e.bottleneck || '')}<br>
+        <strong>机制:</strong> ${esc(e.mechanism || '')}<br>
+        <strong>权衡:</strong> ${esc(e.trade_off || '')}
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('evolution-list').innerHTML = evoHtml || '<p style="color:#555">无数据</p>';
+
+  // Bottlenecks
+  const bnHtml = (data.bottlenecks || []).map(b => `
+    <div class="bottleneck-card">
+      <div class="bottleneck-title">${esc(b.description || '')}</div>
+      <div class="bottleneck-detail">
+        受影响: ${(b.affected_methods||[]).map(m=>esc(m)).join(', ')}<br>
+        已有尝试: ${(b.attempts||[]).map(a=>esc(a)).join(', ')}<br>
+        残留差距: ${esc(b.remaining_gap || '')}<br>
+        突破方向: ${esc(b.potential_direction || '')}
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('bottlenecks-list').innerHTML = bnHtml || '<p style="color:#555">无瓶颈数据</p>';
+
+  // Ideas
+  const ideasHtml = (data.ideas || []).map((idea, i) => `
+    <div class="idea-card">
+      <div class="idea-title">${i+1}. ${esc(idea.title || '')}</div>
+      <div class="idea-field">
+        <div class="idea-field-label">动机</div>
+        <div class="idea-field-text">${esc(idea.motivation || '')}</div>
+      </div>
+      <div class="idea-field">
+        <div class="idea-field-label">方法</div>
+        <div class="idea-field-text">${esc(idea.approach || '')}</div>
+      </div>
+      <div class="idea-field">
+        <div class="idea-field-label">预期贡献</div>
+        <div class="idea-field-text">${esc(idea.expected_contribution || '')}</div>
+      </div>
+      <div class="idea-tags">
+        ${(idea.related_methods||[]).map(m => `<span class="idea-tag">${esc(m)}</span>`).join('')}
+        <span class="idea-tag">${esc(idea.gap_type || '')}</span>
+      </div>
+      <div class="idea-scores">
+        <div class="idea-score"><span class="label">新颖性 </span><span class="value">${idea.novelty_score || '?'}/10</span></div>
+        <div class="idea-score"><span class="label">可行性 </span><span class="value">${idea.feasibility_score || '?'}/10</span></div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('ideas-list').innerHTML = ideasHtml || '<p style="color:#555">无 Idea</p>';
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Enter 键触发
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startRun();
+});
+</script>
+</body>
+</html>
