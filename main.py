@@ -12,6 +12,20 @@ from graph_builder import CitationGraph
 from analyzer import extract_methods, analyze_evolution, generate_ideas, analyze_bottlenecks
 
 
+def search_and_enrich(query: str, limit: int = 15) -> list:
+    """完整模式：用 S2 搜索论文并补充引用信息"""
+    from scholar import search_papers
+    from fast import _fill_urls
+
+    step("搜索论文 (S2 API)")
+    papers = search_papers(query, limit=limit)
+    print(f"  找到 {len(papers)} 篇论文")
+
+    # 补充链接
+    papers = _fill_urls(papers)
+    return papers
+
+
 def step(msg: str):
     print(f"\n{'='*60}")
     print(f"  {msg}")

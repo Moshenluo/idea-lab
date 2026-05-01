@@ -155,6 +155,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         <input type="text" id="query" placeholder="例: graph neural network for citation analysis" value="">
         <button class="btn" id="btn-run" onclick="startRun()">🚀 生成 Idea</button>
       </div>
+      <div style="margin-top:12px;display:flex;gap:16px;align-items:center">
+        <label style="margin:0;font-size:13px;color:#888">模式:</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;color:#ccc">
+          <input type="radio" name="mode" value="fast" checked style="accent-color:#6c5ce7"> ⚡ 快速 (推荐)
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;color:#ccc">
+          <input type="radio" name="mode" value="full" style="accent-color:#6c5ce7"> 🔬 完整 (S2 引用图)
+        </label>
+        <span style="font-size:11px;color:#555">快速模式 ~6次API · 完整模式 ~50次API</span>
+      </div>
     </div>
 
     <div class="progress-box" id="progress-box">
@@ -172,7 +182,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
       <!-- Papers -->
       <div class="section" id="sec-papers">
-        <div class="section-title"><span>📄</span> 论文基础</div>
+        <div class="section-title"><span>📄</span> 论文基础
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn btn-sm btn-outline" onclick="exportPapers('bibtex')">📋 BibTeX</button>
+            <button class="btn btn-sm btn-outline" onclick="exportPapers('csv')">📊 CSV</button>
+            <button class="btn btn-sm btn-outline" onclick="exportPapers('json')">💾 JSON</button>
+          </div>
+        </div>
         <div id="papers-list"></div>
       </div>
 
@@ -245,7 +261,8 @@ function startRun() {
   document.getElementById('sec-graph').style.display = 'none';
   updateProgress('正在启动...', 0);
 
-  fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query})})
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query, mode})})
   .then(r => r.json()).then(data => {
     if (data.error) { alert(data.error); resetUI(); return; }
     currentJobId = data.job_id;
@@ -379,6 +396,54 @@ function deleteHistory(runId) {
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
 document.getElementById('query').addEventListener('keydown', e => { if (e.key==='Enter') startRun(); });
+
+// ─── Export Papers ──────────────────────────────
+let lastResults = null;
+
+function showResults_orig(data) { lastResults = data; }
+
+function exportPapers(fmt) {
+  const papers = (lastResults && lastResults.papers) ? lastResults.papers : [];
+  if (!papers.length) { alert('请先生成论文列表'); return; }
+
+  let content = '', filename = '', mime = '';
+  if (fmt === 'bibtex') {
+    content = papers.map((p, i) => {
+      const key = (p.authors||'unknown').split(' ')[0].toLowerCase() + (p.year||'');
+      return `@article{${key}${i},
+  title = {${p.title||''}},
+  author = {${p.authors||''}},
+  year = {${p.year||''}},
+  journal = {${p.venue||''}},
+  url = {${p.url||''}},
+  abstract = {${p.abstract||''}}
+}`;
+    }).join('\n\n');
+    filename = 'papers.bib'; mime = 'text/plain';
+  } else if (fmt === 'csv') {
+    const header = 'Title,Year,Authors,Venue,Method,Citations,URL';
+    const rows = papers.map(p => {
+      const escCsv = s => '"' + String(s||'').replace(/"/g, '""') + '"';
+      return [escCsv(p.title), p.year, escCsv(p.authors), escCsv(p.venue), escCsv(p.key_method), p.citations_approx||0, escCsv(p.url)].join(',');
+    });
+    content = header + '\n' + rows.join('\n');
+    filename = 'papers.csv'; mime = 'text/csv';
+  } else {
+    content = JSON.stringify(papers, null, 2);
+    filename = 'papers.json'; mime = 'application/json';
+  }
+
+  const blob = new Blob([content], {type: mime+';charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Wrap original showResults to capture data
+const _origShowResults = showResults;
+showResults = function(data) { lastResults = data; _origShowResults(data); };
 </script>
 </body>
 </html>

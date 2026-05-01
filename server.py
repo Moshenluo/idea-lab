@@ -25,6 +25,7 @@ def index():
 def start_run():
     data = request.json
     query = data.get("query", "").strip()
+    mode = data.get("mode", "fast")  # fast or full
     if not query:
         return jsonify({"error": "请输入研究方向"}), 400
 
@@ -32,6 +33,7 @@ def start_run():
     jobs[job_id] = {
         "id": job_id,
         "query": query,
+        "mode": mode,
         "status": "running",
         "step": "初始化...",
         "progress": 0,
@@ -39,7 +41,7 @@ def start_run():
         "error": None,
     }
 
-    thread = threading.Thread(target=run_pipeline, args=(job_id, query))
+    thread = threading.Thread(target=run_pipeline, args=(job_id, query, mode))
     thread.daemon = True
     thread.start()
     return jsonify({"job_id": job_id})
@@ -84,13 +86,17 @@ def serve_output(filename):
     return send_from_directory(OUTPUT_DIR, filename)
 
 
-def run_pipeline(job_id, query):
+def run_pipeline(job_id, query, mode="fast"):
     job = jobs[job_id]
     try:
         # Step 1: 搜索论文
-        job["step"] = "正在搜索论文..."
+        job["step"] = f"正在搜索论文 ({'快速' if mode=='fast' else '完整'}模式)..."
         job["progress"] = 10
-        papers = deepseek_search_papers(query, n=15)
+        if mode == "full":
+            from main import search_and_enrich
+            papers = search_and_enrich(query)
+        else:
+            papers = deepseek_search_papers(query, n=15)
         print(f"  搜索到 {len(papers)} 篇论文")
 
         # 补充链接

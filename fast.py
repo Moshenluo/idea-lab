@@ -16,8 +16,13 @@ def step(msg):
     print(f"{'='*60}")
 
 
+def _scholar_search_url(title: str) -> str:
+    """生成 Google Scholar 搜索链接（最后兜底）"""
+    q = _req.utils.quote(title[:120])
+    return f"https://scholar.google.com/scholar?q={q}"
+
 def _lookup_paper_url(title: str) -> str:
-    """通过 Semantic Scholar 查找论文链接（含重试）"""
+    """通过 Semantic Scholar 查找论文链接（含重试 + 多 ID 回退）"""
     headers = {"Accept": "application/json"}
     if S2_API_KEY:
         headers["x-api-key"] = S2_API_KEY
@@ -25,7 +30,7 @@ def _lookup_paper_url(title: str) -> str:
         try:
             r = _req.get(
                 "https://api.semanticscholar.org/graph/v1/paper/search",
-                params={"query": title[:100], "limit": 1, "fields": "paperId,externalIds,url"},
+                params={"query": title[:100], "limit": 1, "fields": "paperId,externalIds,url,title"},
                 headers=headers,
                 timeout=8
             )
@@ -37,16 +42,29 @@ def _lookup_paper_url(title: str) -> str:
                 if data:
                     p = data[0]
                     ext = p.get("externalIds", {})
+                    # 优先级: arXiv > DOI > PubMed > ACL > DBLP > S2 URL
                     arxiv = ext.get("ArXiv")
                     if arxiv:
                         return f"https://arxiv.org/abs/{arxiv}"
                     doi = ext.get("DOI")
                     if doi:
                         return f"https://doi.org/{doi}"
-                    return p.get("url", "")
+                    pubmed = ext.get("PubMed")
+                    if pubmed:
+                        return f"https://pubmed.ncbi.nlm.nih.gov/{pubmed}"
+                    acl = ext.get("ACL")
+                    if acl:
+                        return f"https://aclanthology.org/{acl}"
+                    dblp = ext.get("DBLP")
+                    if dblp:
+                        return f"https://dblp.org/rec/{dblp}"
+                    s2_url = p.get("url", "")
+                    if s2_url:
+                        return s2_url
         except Exception:
             pass
-    return ""
+    # S2 全部失败，兜底 Google Scholar 搜索
+    return _scholar_search_url(title)
 
 def _fill_urls(papers: list) -> list:
     """通过 S2 验证/替换所有论文 URL（不信任 DeepSeek 生成的链接）"""
