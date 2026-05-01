@@ -10,7 +10,7 @@ DEEPSEEK_MODEL = "deepseek-chat"
 
 # Semantic Scholar API (免费，无需 key)
 S2_API_BASE = "https://api.semanticscholar.org/graph/v1"
-S2_API_KEY = os.environ.get("S2_API_KEY", "")  # 可选，有 key 速率更高
+S2_API_KEY = os.environ.get("S2_API_KEY", "s2k-rKcME5A5qrmGhWumcdX2FhF3uLfKPO2xwfKE1wSm")
 
 # 图谱参数
 MAX_PAPERS = 100          # 单次搜索最大论文数

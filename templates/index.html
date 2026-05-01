@@ -7,17 +7,20 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
-
-/* Header */
 .header { padding: 24px 0; text-align: center; border-bottom: 1px solid #1a1a2e; background: linear-gradient(180deg, #0f0f1a 0%, #0a0a0a 100%); }
-.header h1 { font-size: 28px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+.header h1 { font-size: 28px; font-weight: 700; color: #fff; }
 .header h1 span { color: #6c5ce7; }
 .header p { color: #888; font-size: 14px; margin-top: 6px; }
 
-/* Main container */
 .container { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
 
-/* Search box */
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #111118; border-radius: 10px; padding: 4px; }
+.tab { flex: 1; text-align: center; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: #888; transition: all 0.2s; }
+.tab.active { background: #6c5ce7; color: #fff; }
+.tab:hover:not(.active) { color: #ccc; }
+
+/* Search */
 .search-box { background: #111118; border: 1px solid #222; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
 .search-box label { display: block; font-size: 13px; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
 .search-input-wrap { display: flex; gap: 12px; }
@@ -27,23 +30,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .btn { background: linear-gradient(135deg, #6c5ce7, #a855f7); color: #fff; border: none; border-radius: 8px; padding: 12px 28px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
 .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(108,92,231,0.4); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn-outline { background: transparent; border: 1px solid #333; color: #888; }
+.btn-outline:hover { border-color: #6c5ce7; color: #6c5ce7; box-shadow: none; transform: none; }
+.btn-danger { background: transparent; border: 1px solid #e74c3c; color: #e74c3c; }
+.btn-danger:hover { background: #e74c3c; color: #fff; }
 
 /* Progress */
 .progress-box { background: #111118; border: 1px solid #222; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; display: none; }
 .progress-box.active { display: block; }
 .progress-bar-wrap { background: #1a1a2e; border-radius: 6px; height: 8px; overflow: hidden; margin: 12px 0; }
 .progress-bar { height: 100%; background: linear-gradient(90deg, #6c5ce7, #a855f7); border-radius: 6px; transition: width 0.5s ease; width: 0%; }
-.progress-text { font-size: 13px; color: #888; }
 .progress-step { font-size: 14px; color: #ccc; margin-bottom: 4px; }
-
-/* Results */
-.results { display: none; }
-.results.active { display: block; }
+.progress-text { font-size: 13px; color: #888; }
 
 /* Section */
 .section { background: #111118; border: 1px solid #222; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
 .section-title { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-.section-title .icon { font-size: 20px; }
 
 /* Papers */
 .paper-item { padding: 12px 0; border-bottom: 1px solid #1a1a2e; }
@@ -52,6 +55,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .paper-title a { color: #6c5ce7; text-decoration: none; }
 .paper-title a:hover { text-decoration: underline; }
 .paper-meta { font-size: 12px; color: #666; margin-top: 4px; }
+.paper-meta a { color: #6c5ce7; text-decoration: none; }
 .paper-abstract { font-size: 13px; color: #888; margin-top: 4px; line-height: 1.5; }
 
 /* Methods */
@@ -62,7 +66,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .method-cat { font-size: 11px; color: #666; background: #1a1a2e; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-top: 4px; }
 .method-desc { font-size: 13px; color: #888; margin-top: 8px; line-height: 1.4; }
 
-/* Evolution edges */
+/* Evolution */
 .evo-edge { background: #0a0a0a; border: 1px solid #222; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
 .evo-header { font-size: 14px; font-weight: 600; color: #fff; }
 .evo-relation { color: #6c5ce7; font-weight: 400; }
@@ -88,7 +92,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .idea-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .idea-tag { background: #1a1a2e; color: #888; font-size: 11px; padding: 3px 10px; border-radius: 4px; }
 
-/* Empty state */
+/* Graph iframe */
+.graph-wrap { background: #0a0a0a; border: 1px solid #222; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+.graph-wrap iframe { width: 100%; height: 500px; border: none; }
+
+/* History */
+.history-list { display: flex; flex-direction: column; gap: 10px; }
+.history-item { background: #0a0a0a; border: 1px solid #222; border-radius: 8px; padding: 16px; display: flex; justify-content: space-between; align-items: center; transition: border-color 0.2s; cursor: pointer; }
+.history-item:hover { border-color: #6c5ce7; }
+.history-info h3 { font-size: 14px; color: #fff; font-weight: 500; margin-bottom: 4px; }
+.history-info p { font-size: 12px; color: #666; }
+.history-stats { display: flex; gap: 12px; }
+.history-stat { text-align: center; }
+.history-stat .num { font-size: 18px; font-weight: 700; color: #6c5ce7; }
+.history-stat .lbl { font-size: 10px; color: #666; text-transform: uppercase; }
+.history-actions { display: flex; gap: 6px; margin-left: 16px; }
+
+/* Empty */
 .empty { text-align: center; padding: 60px 20px; color: #555; }
 .empty .icon { font-size: 48px; margin-bottom: 12px; }
 .empty p { font-size: 14px; }
@@ -101,11 +121,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 .loading { animation: pulse 1.5s infinite; }
 
-/* Responsive */
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
 @media (max-width: 600px) {
   .search-input-wrap { flex-direction: column; }
   .method-grid { grid-template-columns: 1fr; }
   .idea-scores { flex-direction: column; gap: 6px; }
+  .history-item { flex-direction: column; gap: 12px; align-items: flex-start; }
 }
 </style>
 </head>
@@ -113,124 +137,136 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 <div class="header">
   <h1>🔬 Idea<span>Lab</span></h1>
-  <p>基于方法演化图谱的 AI 研究 Idea 生成器</p>
+  <p>基于方法演化图谱的 AI 研究 Idea 生成器 · Inspired by <a href="https://arxiv.org/abs/2604.28158" target="_blank" style="color:#6c5ce7">Intern-Atlas</a></p>
 </div>
 
 <div class="container">
-  <!-- Search -->
-  <div class="search-box">
-    <label>研究方向</label>
-    <div class="search-input-wrap">
-      <input type="text" id="query" placeholder="例: graph neural network for citation analysis" value="">
-      <button class="btn" id="btn-run" onclick="startRun()">🚀 生成 Idea</button>
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('generate')">🚀 生成</div>
+    <div class="tab" onclick="switchTab('history')">📂 历史</div>
+  </div>
+
+  <!-- Generate Tab -->
+  <div class="tab-content active" id="tab-generate">
+    <div class="search-box">
+      <label>研究方向</label>
+      <div class="search-input-wrap">
+        <input type="text" id="query" placeholder="例: graph neural network for citation analysis" value="">
+        <button class="btn" id="btn-run" onclick="startRun()">🚀 生成 Idea</button>
+      </div>
+    </div>
+
+    <div class="progress-box" id="progress-box">
+      <div class="progress-step" id="progress-step">准备中...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-text" id="progress-text">0%</div>
+    </div>
+
+    <div class="results" id="results">
+      <!-- Graph -->
+      <div class="section" id="sec-graph" style="display:none">
+        <div class="section-title"><span>🗺️</span> 方法演化图谱</div>
+        <div class="graph-wrap"><iframe id="graph-frame" src=""></iframe></div>
+      </div>
+
+      <!-- Papers -->
+      <div class="section" id="sec-papers">
+        <div class="section-title"><span>📄</span> 论文基础</div>
+        <div id="papers-list"></div>
+      </div>
+
+      <!-- Methods -->
+      <div class="section" id="sec-methods">
+        <div class="section-title"><span>🔧</span> 方法实体</div>
+        <div class="method-grid" id="methods-grid"></div>
+      </div>
+
+      <!-- Evolution -->
+      <div class="section" id="sec-evolution">
+        <div class="section-title"><span>🔗</span> 演化关系</div>
+        <div id="evolution-list"></div>
+      </div>
+
+      <!-- Bottlenecks -->
+      <div class="section" id="sec-bottlenecks">
+        <div class="section-title"><span>⚠️</span> 瓶颈分析</div>
+        <div id="bottlenecks-list"></div>
+      </div>
+
+      <!-- Ideas -->
+      <div class="section" id="sec-ideas">
+        <div class="section-title"><span>💡</span> 研究 Idea</div>
+        <div id="ideas-list"></div>
+      </div>
+    </div>
+
+    <div class="empty" id="empty-state">
+      <div class="icon">🧪</div>
+      <p>输入研究方向，AI 将自动搜索论文、构建方法演化图谱、生成研究 Idea</p>
     </div>
   </div>
 
-  <!-- Progress -->
-  <div class="progress-box" id="progress-box">
-    <div class="progress-step" id="progress-step">准备中...</div>
-    <div class="progress-bar-wrap">
-      <div class="progress-bar" id="progress-bar"></div>
+  <!-- History Tab -->
+  <div class="tab-content" id="tab-history">
+    <div class="history-list" id="history-list">
+      <div class="empty"><div class="icon">📂</div><p>加载中...</p></div>
     </div>
-    <div class="progress-text" id="progress-text">0%</div>
-  </div>
-
-  <!-- Results -->
-  <div class="results" id="results">
-    <!-- Papers -->
-    <div class="section" id="sec-papers">
-      <div class="section-title"><span class="icon">📄</span> 论文基础</div>
-      <div id="papers-list"></div>
-    </div>
-
-    <!-- Methods -->
-    <div class="section" id="sec-methods">
-      <div class="section-title"><span class="icon">🔧</span> 方法实体</div>
-      <div class="method-grid" id="methods-grid"></div>
-    </div>
-
-    <!-- Evolution -->
-    <div class="section" id="sec-evolution">
-      <div class="section-title"><span class="icon">🔗</span> 演化关系</div>
-      <div id="evolution-list"></div>
-    </div>
-
-    <!-- Bottlenecks -->
-    <div class="section" id="sec-bottlenecks">
-      <div class="section-title"><span class="icon">⚠️</span> 瓶颈分析</div>
-      <div id="bottlenecks-list"></div>
-    </div>
-
-    <!-- Ideas -->
-    <div class="section" id="sec-ideas">
-      <div class="section-title"><span class="icon">💡</span> 研究 Idea</div>
-      <div id="ideas-list"></div>
-    </div>
-  </div>
-
-  <!-- Empty state -->
-  <div class="empty" id="empty-state">
-    <div class="icon">🧪</div>
-    <p>输入研究方向，AI 将自动搜索论文、构建方法演化图谱、生成研究 Idea</p>
   </div>
 </div>
 
 <div class="footer">
-  IdeaLab — 基于 <a href="https://arxiv.org/abs/2604.28158" target="_blank">Intern-Atlas</a> 思路的轻量实现<br>
-  Powered by Semantic Scholar + DeepSeek
+  IdeaLab v2 · <a href="https://github.com/Moshenluo/idea-lab" target="_blank">GitHub</a> · Powered by DeepSeek + Semantic Scholar
 </div>
 
 <script>
 let currentJobId = null;
 let pollTimer = null;
 
+// ─── Tab switching ─────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (name==='generate' && i===0) || (name==='history' && i===1));
+  });
+  document.getElementById('tab-generate').classList.toggle('active', name==='generate');
+  document.getElementById('tab-history').classList.toggle('active', name==='history');
+  if (name === 'history') loadHistory();
+}
+
+// ─── Generate ──────────────────────────────────
 function startRun() {
   const query = document.getElementById('query').value.trim();
   if (!query) { alert('请输入研究方向'); return; }
 
-  // UI 状态
   document.getElementById('btn-run').disabled = true;
   document.getElementById('progress-box').classList.add('active');
   document.getElementById('results').classList.remove('active');
   document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('sec-graph').style.display = 'none';
   updateProgress('正在启动...', 0);
 
-  fetch('/api/run', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({query: query})
-  })
-  .then(r => r.json())
-  .then(data => {
+  fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query})})
+  .then(r => r.json()).then(data => {
     if (data.error) { alert(data.error); resetUI(); return; }
     currentJobId = data.job_id;
     pollStatus();
-  })
-  .catch(err => { alert('请求失败: ' + err); resetUI(); });
+  }).catch(err => { alert('请求失败: '+err); resetUI(); });
 }
 
 function pollStatus() {
   if (!currentJobId) return;
-  fetch('/api/status/' + currentJobId)
-  .then(r => r.json())
-  .then(data => {
+  fetch('/api/status/'+currentJobId).then(r=>r.json()).then(data => {
     updateProgress(data.step, data.progress);
-    if (data.status === 'done') {
-      setTimeout(() => showResults(data.result), 500);
-    } else if (data.status === 'error') {
-      alert('出错: ' + data.error);
-      resetUI();
-    } else {
-      pollTimer = setTimeout(pollStatus, 1000);
-    }
-  })
-  .catch(() => { pollTimer = setTimeout(pollStatus, 2000); });
+    if (data.status === 'done') setTimeout(() => showResults(data.result), 500);
+    else if (data.status === 'error') { alert('出错: '+data.error); resetUI(); }
+    else pollTimer = setTimeout(pollStatus, 1500);
+  }).catch(() => { pollTimer = setTimeout(pollStatus, 3000); });
 }
 
 function updateProgress(step, pct) {
   document.getElementById('progress-step').textContent = step;
-  document.getElementById('progress-bar').style.width = pct + '%';
-  document.getElementById('progress-text').textContent = pct + '%';
+  document.getElementById('progress-bar').style.width = pct+'%';
+  document.getElementById('progress-text').textContent = pct+'%';
 }
 
 function resetUI() {
@@ -244,96 +280,105 @@ function showResults(data) {
   document.getElementById('progress-box').classList.remove('active');
   document.getElementById('results').classList.add('active');
 
+  // Graph
+  if (data.graph_url) {
+    document.getElementById('sec-graph').style.display = '';
+    document.getElementById('graph-frame').src = data.graph_url;
+  }
+
   // Papers
-  const papersHtml = (data.papers || []).map(p => {
-    const titleHtml = p.url
-      ? `<a href="${esc(p.url)}" target="_blank">${esc(p.title || '')}</a>`
-      : esc(p.title || '');
-    return `
-    <div class="paper-item">
-      <div class="paper-title">[${p.year || '?'}] ${titleHtml}</div>
-      <div class="paper-meta">${esc(p.key_method || '')} · ${esc(p.venue || '')} · ~${p.citations_approx || 0} 引用${p.url ? ' · <a href="' + esc(p.url) + '" target="_blank" style="color:#6c5ce7">🔗 链接</a>' : ''}</div>
-      <div class="paper-abstract">${esc(p.abstract || '')}</div>
+  document.getElementById('papers-list').innerHTML = (data.papers||[]).map(p => {
+    const t = p.url ? `<a href="${esc(p.url)}" target="_blank">${esc(p.title||'')}</a>` : esc(p.title||'');
+    const link = p.url ? ` · <a href="${esc(p.url)}" target="_blank">🔗 链接</a>` : '';
+    return `<div class="paper-item">
+      <div class="paper-title">[${p.year||'?'}] ${t}</div>
+      <div class="paper-meta">${esc(p.key_method||'')} · ${esc(p.venue||'')} · ~${p.citations_approx||0} 引用${link}</div>
+      <div class="paper-abstract">${esc(p.abstract||'')}</div>
     </div>`;
-  }).join('');
-  document.getElementById('papers-list').innerHTML = papersHtml || '<p style="color:#555">无数据</p>';
+  }).join('') || '<p style="color:#555">无数据</p>';
 
   // Methods
-  const methodsHtml = (data.methods || []).map(m => `
+  document.getElementById('methods-grid').innerHTML = (data.methods||[]).map(m => `
     <div class="method-card">
-      <div class="method-name">${esc(m.name || '')}</div>
-      <div class="method-cat">${esc(m.category || '')} · ${esc(String(m.year || ''))}</div>
-      <div class="method-desc">${esc(m.description || '')}</div>
-    </div>
-  `).join('');
-  document.getElementById('methods-grid').innerHTML = methodsHtml || '<p style="color:#555">无数据</p>';
+      <div class="method-name">${esc(m.name||'')}</div>
+      <div class="method-cat">${esc(m.category||'')} · ${esc(String(m.year||''))}</div>
+      <div class="method-desc">${esc(m.description||'')}</div>
+    </div>`).join('') || '<p style="color:#555">无数据</p>';
 
   // Evolution
-  const evoHtml = (data.evolution_edges || []).map(e => `
+  document.getElementById('evolution-list').innerHTML = (data.evolution_edges||[]).map(e => `
     <div class="evo-edge">
-      <div class="evo-header">${esc(e.source || '')} → <span class="evo-relation">[${esc(e.relation || '')}]</span> → ${esc(e.target || '')}</div>
-      <div class="evo-detail">
-        <strong>瓶颈:</strong> ${esc(e.bottleneck || '')}<br>
-        <strong>机制:</strong> ${esc(e.mechanism || '')}<br>
-        <strong>权衡:</strong> ${esc(e.trade_off || '')}
-      </div>
-    </div>
-  `).join('');
-  document.getElementById('evolution-list').innerHTML = evoHtml || '<p style="color:#555">无数据</p>';
+      <div class="evo-header">${esc(e.source||'')} → <span class="evo-relation">[${esc(e.relation||'')}]</span> → ${esc(e.target||'')}</div>
+      <div class="evo-detail"><strong>瓶颈:</strong> ${esc(e.bottleneck||'')}<br><strong>机制:</strong> ${esc(e.mechanism||'')}<br><strong>权衡:</strong> ${esc(e.trade_off||'')}</div>
+    </div>`).join('') || '<p style="color:#555">无数据</p>';
 
   // Bottlenecks
-  const bnHtml = (data.bottlenecks || []).map(b => `
+  document.getElementById('bottlenecks-list').innerHTML = (data.bottlenecks||[]).map(b => `
     <div class="bottleneck-card">
-      <div class="bottleneck-title">${esc(b.description || '')}</div>
-      <div class="bottleneck-detail">
-        受影响: ${(b.affected_methods||[]).map(m=>esc(m)).join(', ')}<br>
-        已有尝试: ${(b.attempts||[]).map(a=>esc(a)).join(', ')}<br>
-        残留差距: ${esc(b.remaining_gap || '')}<br>
-        突破方向: ${esc(b.potential_direction || '')}
-      </div>
-    </div>
-  `).join('');
-  document.getElementById('bottlenecks-list').innerHTML = bnHtml || '<p style="color:#555">无瓶颈数据</p>';
+      <div class="bottleneck-title">${esc(b.description||'')}</div>
+      <div class="bottleneck-detail">受影响: ${(b.affected_methods||[]).map(m=>esc(m)).join(', ')}<br>已有尝试: ${(b.attempts||[]).map(a=>esc(a)).join(', ')}<br>残留差距: ${esc(b.remaining_gap||'')}<br>突破方向: ${esc(b.potential_direction||'')}</div>
+    </div>`).join('') || '<p style="color:#555">无瓶颈数据</p>';
 
   // Ideas
-  const ideasHtml = (data.ideas || []).map((idea, i) => `
+  document.getElementById('ideas-list').innerHTML = (data.ideas||[]).map((idea,i) => `
     <div class="idea-card">
-      <div class="idea-title">${i+1}. ${esc(idea.title || '')}</div>
-      <div class="idea-field">
-        <div class="idea-field-label">动机</div>
-        <div class="idea-field-text">${esc(idea.motivation || '')}</div>
-      </div>
-      <div class="idea-field">
-        <div class="idea-field-label">方法</div>
-        <div class="idea-field-text">${esc(idea.approach || '')}</div>
-      </div>
-      <div class="idea-field">
-        <div class="idea-field-label">预期贡献</div>
-        <div class="idea-field-text">${esc(idea.expected_contribution || '')}</div>
-      </div>
-      <div class="idea-tags">
-        ${(idea.related_methods||[]).map(m => `<span class="idea-tag">${esc(m)}</span>`).join('')}
-        <span class="idea-tag">${esc(idea.gap_type || '')}</span>
-      </div>
+      <div class="idea-title">${i+1}. ${esc(idea.title||'')}</div>
+      <div class="idea-field"><div class="idea-field-label">动机</div><div class="idea-field-text">${esc(idea.motivation||'')}</div></div>
+      <div class="idea-field"><div class="idea-field-label">方法</div><div class="idea-field-text">${esc(idea.approach||'')}</div></div>
+      <div class="idea-field"><div class="idea-field-label">预期贡献</div><div class="idea-field-text">${esc(idea.expected_contribution||'')}</div></div>
+      <div class="idea-tags">${(idea.related_methods||[]).map(m=>`<span class="idea-tag">${esc(m)}</span>`).join('')}<span class="idea-tag">${esc(idea.gap_type||'')}</span></div>
       <div class="idea-scores">
-        <div class="idea-score"><span class="label">新颖性 </span><span class="value">${idea.novelty_score || '?'}/10</span></div>
-        <div class="idea-score"><span class="label">可行性 </span><span class="value">${idea.feasibility_score || '?'}/10</span></div>
+        <div class="idea-score"><span class="label">新颖性 </span><span class="value">${idea.novelty_score||'?'}/10</span></div>
+        <div class="idea-score"><span class="label">可行性 </span><span class="value">${idea.feasibility_score||'?'}/10</span></div>
       </div>
-    </div>
-  `).join('');
-  document.getElementById('ideas-list').innerHTML = ideasHtml || '<p style="color:#555">无 Idea</p>';
+    </div>`).join('') || '<p style="color:#555">无 Idea</p>';
 }
 
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+// ─── History ───────────────────────────────────
+function loadHistory() {
+  fetch('/api/history').then(r=>r.json()).then(runs => {
+    if (!runs.length) {
+      document.getElementById('history-list').innerHTML = '<div class="empty"><div class="icon">📂</div><p>暂无历史记录</p></div>';
+      return;
+    }
+    document.getElementById('history-list').innerHTML = runs.map(r => `
+      <div class="history-item" onclick="viewHistory('${r.id}')">
+        <div class="history-info">
+          <h3>${esc(r.query)}</h3>
+          <p>${esc(r.id)} · ${esc(r.timestamp)}</p>
+        </div>
+        <div class="history-stats">
+          <div class="history-stat"><div class="num">${r.num_papers}</div><div class="lbl">论文</div></div>
+          <div class="history-stat"><div class="num">${r.num_methods}</div><div class="lbl">方法</div></div>
+          <div class="history-stat"><div class="num">${r.num_edges}</div><div class="lbl">演化边</div></div>
+          <div class="history-stat"><div class="num">${r.num_ideas}</div><div class="lbl">Idea</div></div>
+        </div>
+        <div class="history-actions">
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();viewHistory('${r.id}')">查看</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteHistory('${r.id}')">删除</button>
+        </div>
+      </div>`).join('');
+  }).catch(err => {
+    document.getElementById('history-list').innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>加载失败: ${err}</p></div>`;
+  });
 }
 
-// Enter 键触发
-document.getElementById('query').addEventListener('keydown', e => {
-  if (e.key === 'Enter') startRun();
-});
+function viewHistory(runId) {
+  fetch('/api/history/'+runId).then(r=>r.json()).then(data => {
+    switchTab('generate');
+    showResults(data);
+    document.getElementById('query').value = data.query || '';
+  });
+}
+
+function deleteHistory(runId) {
+  if (!confirm('确定删除这条记录？')) return;
+  fetch('/api/history/'+runId, {method:'DELETE'}).then(r=>r.json()).then(() => loadHistory());
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+document.getElementById('query').addEventListener('keydown', e => { if (e.key==='Enter') startRun(); });
 </script>
 </body>
 </html>
