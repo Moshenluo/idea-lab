@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from datetime import datetime
 from config import OUTPUT_DIR, MAX_IDEAS, S2_API_KEY
 from analyzer import _chat, _parse_json, extract_methods, analyze_evolution, generate_ideas, analyze_bottlenecks
+import re
 import requests as _req
 
 
@@ -30,8 +31,59 @@ def _scholar_search_url(title: str) -> str:
     q = _req.utils.quote(title[:120])
     return f"https://scholar.google.com/scholar?q={q}"
 
+def _lookup_crossref(title: str) -> str:
+    """通过 CrossRef 查找 DOI"""
+    try:
+        r = _req.get(
+            "https://api.crossref.org/works",
+            params={"query": title[:120], "rows": 1},
+            headers={"Accept": "application/json"},
+            timeout=10
+        )
+        if r.status_code == 200:
+            items = r.json().get("message", {}).get("items", [])
+            if items:
+                item = items[0]
+                # 验证标题相似度
+                cr_title = " ".join(item.get("title", []))
+                if cr_title and _title_similarity(title, cr_title) >= 0.4:
+                    doi = item.get("DOI", "")
+                    if doi:
+                        return f"https://doi.org/{doi}"
+    except Exception:
+        pass
+    return ""
+
+def _lookup_openalex(title: str) -> str:
+    """通过 OpenAlex 查找论文链接"""
+    try:
+        r = _req.get(
+            "https://api.openalex.org/works",
+            params={"search": title[:120], "per_page": 1},
+            headers={"Accept": "application/json"},
+            timeout=10
+        )
+        if r.status_code == 200:
+            results = r.json().get("results", [])
+            if results:
+                w = results[0]
+                # 验证标题相似度
+                oa_title = w.get("title", "")
+                if oa_title and _title_similarity(title, oa_title) >= 0.4:
+                    # 优先 DOI，其次 OpenAlex 自身链接
+                    doi = w.get("doi", "")
+                    if doi:
+                        return doi
+                    oa_url = w.get("id", "")
+                    if oa_url:
+                        return oa_url
+    except Exception:
+        pass
+    return ""
+
 def _lookup_paper_url(title: str) -> str:
-    """通过 Semantic Scholar 查找论文链接（含重试 + 多 ID 回退）"""
+    """多源查找论文链接: S2 → CrossRef → OpenAlex → Google Scholar"""
+    # 1. Semantic Scholar
     headers = {"Accept": "application/json"}
     if S2_API_KEY:
         headers["x-api-key"] = S2_API_KEY
@@ -39,7 +91,7 @@ def _lookup_paper_url(title: str) -> str:
         try:
             r = _req.get(
                 "https://api.semanticscholar.org/graph/v1/paper/search",
-                params={"query": title[:100], "limit": 1, "fields": "paperId,externalIds,url,title"},
+                params={"query": title[:100], "limit": 3, "fields": "paperId,externalIds,url,title"},
                 headers=headers,
                 timeout=8
             )
@@ -47,25 +99,11 @@ def _lookup_paper_url(title: str) -> str:
                 time.sleep(2 * (attempt + 1))
                 continue
             if r.status_code == 200:
-                data = r.json().get("data", [])
-                if data:
-                    # 验证标题相似度（阈值 0.4）
-                    p = data[0]
+                for p in r.json().get("data", []):
                     s2_title = p.get("title", "")
                     if s2_title and _title_similarity(title, s2_title) < 0.4:
-                        # 标题不匹配，尝试 limit=3 找更合适的
-                        r2 = _req.get(
-                            "https://api.semanticscholar.org/graph/v1/paper/search",
-                            params={"query": title[:100], "limit": 3, "fields": "paperId,externalIds,url,title"},
-                            headers=headers, timeout=8
-                        )
-                        if r2.status_code == 200:
-                            for cand in r2.json().get("data", []):
-                                if _title_similarity(title, cand.get("title", "")) >= 0.4:
-                                    p = cand
-                                    break
+                        continue
                     ext = p.get("externalIds", {})
-                    # 优先级: arXiv > DOI > PubMed > ACL > DBLP > S2 URL
                     arxiv = ext.get("ArXiv")
                     if arxiv:
                         return f"https://arxiv.org/abs/{arxiv}"
@@ -86,7 +124,18 @@ def _lookup_paper_url(title: str) -> str:
                         return s2_url
         except Exception:
             pass
-    # S2 全部失败，兜底 Google Scholar 搜索
+
+    # 2. CrossRef
+    url = _lookup_crossref(title)
+    if url:
+        return url
+
+    # 3. OpenAlex
+    url = _lookup_openalex(title)
+    if url:
+        return url
+
+    # 4. Google Scholar 搜索（最后兜底）
     return _scholar_search_url(title)
 
 def _fill_urls(papers: list) -> list:
