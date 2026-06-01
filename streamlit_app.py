@@ -234,12 +234,18 @@ def _run_pipeline(query: str, paper_count: int, fill_missing_urls: bool) -> Dict
         update(info.get("message") or "正在检索论文...", pct)
 
     update("正在召回并校验论文...", 8)
-    papers = deepseek_search_papers(
-        query,
-        n=paper_count,
-        progress_callback=on_search_progress,
-        fill_missing_urls=fill_missing_urls,
-    )
+    try:
+        papers = deepseek_search_papers(
+            query,
+            n=paper_count,
+            progress_callback=on_search_progress,
+            fill_missing_urls=fill_missing_urls,
+        )
+    except TypeError as exc:
+        if "fill_missing_urls" not in str(exc):
+            raise
+        update("当前运行环境仍在使用旧版检索函数，已自动回退兼容模式...", 10)
+        papers = deepseek_search_papers(query, n=paper_count, progress_callback=on_search_progress)
 
     update("正在构建方法演化图谱...", 42)
     graph_data = deepseek_build_evolution(papers)
