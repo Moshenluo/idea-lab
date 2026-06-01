@@ -14,8 +14,8 @@ def _client():
     if not DEEPSEEK_API_KEY:
         raise ValueError(
             "未设置 DEEPSEEK_API_KEY！\n"
-            "请运行: $env:DEEPSEEK_API_KEY = 'your-key-here'\n"
-            "或在 config.py 中直接填写"
+            "本地运行请设置环境变量或 .streamlit/secrets.toml；\n"
+            "Streamlit Community Cloud 请在 App settings -> Secrets 中添加。"
         )
     return OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
 

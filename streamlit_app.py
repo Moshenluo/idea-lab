@@ -324,7 +324,9 @@ if submitted:
             st.session_state["result"] = _run_pipeline(query.strip(), paper_count)
             st.rerun()
         except Exception as exc:
-            st.exception(exc)
+            st.error(f"生成失败：{exc}")
+            with st.expander("查看技术详情"):
+                st.exception(exc)
 
 if "result" in st.session_state:
     _render_result(st.session_state["result"])
