@@ -3,11 +3,15 @@ Demo — 不需要 API key，用模拟数据验证 pipeline
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import json
 from datetime import datetime
 from config import OUTPUT_DIR
 from graph_builder import CitationGraph
+from method_utils import normalize_methods_list, dedupe_edges
+from idea_utils import annotate_and_rerank_ideas
 
 
 def run_demo():
@@ -151,12 +155,18 @@ def run_demo():
     ]
 
     for src, tgt, rel, bottleneck, mechanism, tradeoff in evolution_edges:
-        graph.method_graph.add_edge(tgt, src,
+        graph.method_graph.add_edge(src, tgt,
             relation=rel, bottleneck=bottleneck,
             mechanism=mechanism, tradeoff=tradeoff, confidence=0.9)
 
     print(f"✓ 方法: {len(methods)} 个")
     print(f"✓ 演化边: {len(evolution_edges)} 条\n")
+
+    methods_list = normalize_methods_list(list(methods.values()))
+    edge_records = dedupe_edges([
+        {"source": s, "target": t, "relation": r, "bottleneck": b, "mechanism": m, "trade_off": tr, "confidence": 0.9}
+        for s, t, r, b, m, tr in evolution_edges
+    ])
 
     # ─── 生成报告 ────────────────────────────────────────
     # 模拟 idea
@@ -202,6 +212,7 @@ def run_demo():
             "feasibility_score": 5,
         },
     ]
+    ideas = annotate_and_rerank_ideas(ideas, methods_list, edge_records, max_ideas=len(ideas))
 
     # 写报告
     report_path = os.path.join(run_dir, "report.md")
@@ -242,17 +253,16 @@ def run_demo():
             f.write(f"**预期贡献:** {idea['expected_contribution']}\n\n")
             f.write(f"**相关方法:** {', '.join(idea['related_methods'])}\n\n")
             f.write(f"**Gap 类型:** {idea['gap_type']} | **新颖性:** {idea['novelty_score']}/10 | **可行性:** {idea['feasibility_score']}/10\n\n")
+            if idea.get("novelty_rationale"):
+                f.write(f"**Novelty Filter:** {idea['novelty_rationale']}\n\n")
             f.write("---\n\n")
 
     # 保存 JSON
     result_path = os.path.join(run_dir, "result.json")
     with open(result_path, "w", encoding="utf-8") as f:
         json.dump({
-            "methods": methods,
-            "evolution_edges": [
-                {"from": s, "to": t, "relation": r, "bottleneck": b, "mechanism": m, "tradeoff": tr}
-                for s, t, r, b, m, tr in evolution_edges
-            ],
+            "methods": methods_list,
+            "evolution_edges": edge_records,
             "ideas": ideas,
         }, f, ensure_ascii=False, indent=2)
 

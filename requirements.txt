@@ -1,0 +1,6 @@
+streamlit>=1.35
+openai>=1.30
+requests>=2.31
+networkx>=3.2
+pyvis>=0.3.2
+flask>=3.0

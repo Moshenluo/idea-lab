@@ -33,6 +33,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .btn-sm { padding: 6px 14px; font-size: 12px; }
 .btn-outline { background: transparent; border: 1px solid #333; color: #888; }
 .btn-outline:hover { border-color: #6c5ce7; color: #6c5ce7; box-shadow: none; transform: none; }
+.btn-disabled,
+.btn[aria-disabled="true"] { opacity: 0.45; pointer-events: none; cursor: not-allowed; }
 .btn-danger { background: transparent; border: 1px solid #e74c3c; color: #e74c3c; }
 .btn-danger:hover { background: #e74c3c; color: #fff; }
 
@@ -46,7 +48,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 /* Section */
 .section { background: #111118; border: 1px solid #222; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
-.section-title { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.section-title { font-size: 18px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; }
+.section-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* Papers */
 .paper-item { padding: 12px 0; border-bottom: 1px solid #1a1a2e; }
@@ -137,7 +141,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 <div class="header">
   <h1>🔬 Idea<span>Lab</span></h1>
-  <p>基于方法演化图谱的 AI 研究 Idea 生成器 · Inspired by <a href="https://arxiv.org/abs/2604.28158" target="_blank" style="color:#6c5ce7">Intern-Atlas</a></p>
+  <p>基于论文演化分析的 AI 研究 Idea 生成器 · Inspired by <a href="https://arxiv.org/abs/2604.28158" target="_blank" style="color:#6c5ce7">Intern-Atlas</a></p>
 </div>
 
 <div class="container">
@@ -164,15 +168,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
     </div>
 
     <div class="results" id="results">
-      <!-- Graph -->
-      <div class="section" id="sec-graph" style="display:none">
-        <div class="section-title"><span>🗺️</span> 方法演化图谱</div>
-        <div class="graph-wrap"><iframe id="graph-frame" src=""></iframe></div>
-      </div>
-
       <!-- Papers -->
       <div class="section" id="sec-papers">
-        <div class="section-title"><span>📄</span> 论文基础</div>
+        <div class="section-head">
+          <div class="section-title"><span>📄</span> 论文基础</div>
+          <div class="section-actions">
+            <button class="btn btn-sm btn-outline btn-disabled" id="btn-export-papers" onclick="exportPapersCsv()" disabled>导出论文 CSV</button>
+            <a class="btn btn-sm btn-outline btn-disabled" id="btn-export-report" href="#" target="_blank" aria-disabled="true">导出报告</a>
+            <a class="btn btn-sm btn-outline btn-disabled" id="btn-export-json" href="#" target="_blank" aria-disabled="true">导出 JSON</a>
+          </div>
+        </div>
         <div id="papers-list"></div>
       </div>
 
@@ -203,7 +208,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
     <div class="empty" id="empty-state">
       <div class="icon">🧪</div>
-      <p>输入研究方向，AI 将自动搜索论文、构建方法演化图谱、生成研究 Idea</p>
+      <p>输入研究方向，AI 将自动搜索论文、分析方法演化、生成研究 Idea</p>
     </div>
   </div>
 
@@ -222,6 +227,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 <script>
 let currentJobId = null;
 let pollTimer = null;
+let currentResult = null;
 
 // ─── Tab switching ─────────────────────────────
 function switchTab(name) {
@@ -238,11 +244,12 @@ function startRun() {
   const query = document.getElementById('query').value.trim();
   if (!query) { alert('请输入研究方向'); return; }
 
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  currentJobId = null;
   document.getElementById('btn-run').disabled = true;
   document.getElementById('progress-box').classList.add('active');
   document.getElementById('results').classList.remove('active');
   document.getElementById('empty-state').style.display = 'none';
-  document.getElementById('sec-graph').style.display = 'none';
   updateProgress('正在启动...', 0);
 
   fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query})})
@@ -257,8 +264,17 @@ function pollStatus() {
   if (!currentJobId) return;
   fetch('/api/status/'+currentJobId).then(r=>r.json()).then(data => {
     updateProgress(data.step, data.progress);
-    if (data.status === 'done') setTimeout(() => showResults(data.result), 500);
-    else if (data.status === 'error') { alert('出错: '+data.error); resetUI(); }
+    if (data.status === 'done') {
+      currentJobId = null;
+      pollTimer = null;
+      setTimeout(() => showResults(data.result), 500);
+    }
+    else if (data.status === 'error') {
+      currentJobId = null;
+      pollTimer = null;
+      alert('出错: '+data.error);
+      resetUI();
+    }
     else pollTimer = setTimeout(pollStatus, 1500);
   }).catch(() => { pollTimer = setTimeout(pollStatus, 3000); });
 }
@@ -270,26 +286,43 @@ function updateProgress(step, pct) {
 }
 
 function resetUI() {
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  currentResult = null;
   document.getElementById('btn-run').disabled = false;
   document.getElementById('progress-box').classList.remove('active');
   document.getElementById('empty-state').style.display = '';
 }
 
 function showResults(data) {
+  currentResult = data || null;
   document.getElementById('btn-run').disabled = false;
   document.getElementById('progress-box').classList.remove('active');
   document.getElementById('results').classList.add('active');
 
-  // Graph
-  if (data.graph_url) {
-    document.getElementById('sec-graph').style.display = '';
-    document.getElementById('graph-frame').src = data.graph_url;
-  }
+  const hasPapers = (data.papers || []).length > 0;
+  const btnExportPapers = document.getElementById('btn-export-papers');
+  const btnExportReport = document.getElementById('btn-export-report');
+  const btnExportJson = document.getElementById('btn-export-json');
+  btnExportPapers.disabled = !hasPapers;
+  btnExportPapers.classList.toggle('btn-disabled', !hasPapers);
+  btnExportReport.classList.toggle('btn-disabled', !data.report_url);
+  btnExportJson.classList.toggle('btn-disabled', !data.result_url);
+  btnExportReport.setAttribute('aria-disabled', data.report_url ? 'false' : 'true');
+  btnExportJson.setAttribute('aria-disabled', data.result_url ? 'false' : 'true');
+  btnExportReport.href = data.report_url || '#';
+  btnExportJson.href = data.result_url || '#';
 
   // Papers
   document.getElementById('papers-list').innerHTML = (data.papers||[]).map(p => {
-    const t = p.url ? `<a href="${esc(p.url)}" target="_blank">${esc(p.title||'')}</a>` : esc(p.title||'');
-    const link = p.url ? ` · <a href="${esc(p.url)}" target="_blank">🔗 链接</a>` : '';
+    const reliableLink = p.url && p.verification_source === 'semantic_scholar';
+    const searchUrl = `https://www.semanticscholar.org/search?q=${encodeURIComponent(p.title || '')}`;
+    const titleSuffix = p.verification_source === 'llm_only' ? ' <span style="color:#666;font-size:12px">未校验</span>' : '';
+    const t = reliableLink
+      ? `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.title||'')}</a>`
+      : `<a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer">${esc(p.title||'')}</a>${titleSuffix}`;
+    const link = reliableLink
+      ? ` · <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">🔗 链接</a>`
+      : ` · <a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer">🔎 搜索</a>`;
     return `<div class="paper-item">
       <div class="paper-title">[${p.year||'?'}] ${t}</div>
       <div class="paper-meta">${esc(p.key_method||'')} · ${esc(p.venue||'')} · ~${p.citations_approx||0} 引用${link}</div>
@@ -309,7 +342,7 @@ function showResults(data) {
   document.getElementById('evolution-list').innerHTML = (data.evolution_edges||[]).map(e => `
     <div class="evo-edge">
       <div class="evo-header">${esc(e.source||'')} → <span class="evo-relation">[${esc(e.relation||'')}]</span> → ${esc(e.target||'')}</div>
-      <div class="evo-detail"><strong>瓶颈:</strong> ${esc(e.bottleneck||'')}<br><strong>机制:</strong> ${esc(e.mechanism||'')}<br><strong>权衡:</strong> ${esc(e.trade_off||'')}</div>
+      <div class="evo-detail"><strong>瓶颈:</strong> ${esc(e.bottleneck||'')}<br><strong>机制:</strong> ${esc(e.mechanism||'')}<br><strong>权衡:</strong> ${esc(e.trade_off||'')}${e.evidence ? `<br><strong>证据:</strong> ${esc(e.evidence||'')}` : ''}${((e.source_paper_titles||[]).length || (e.target_paper_titles||[]).length) ? `<br><strong>论文依据:</strong> ${esc((e.source_paper_titles||[]).slice(0,2).join(', '))} → ${esc((e.target_paper_titles||[]).slice(0,2).join(', '))}` : ''}</div>
     </div>`).join('') || '<p style="color:#555">无数据</p>';
 
   // Bottlenecks
@@ -326,6 +359,7 @@ function showResults(data) {
       <div class="idea-field"><div class="idea-field-label">动机</div><div class="idea-field-text">${esc(idea.motivation||'')}</div></div>
       <div class="idea-field"><div class="idea-field-label">方法</div><div class="idea-field-text">${esc(idea.approach||'')}</div></div>
       <div class="idea-field"><div class="idea-field-label">预期贡献</div><div class="idea-field-text">${esc(idea.expected_contribution||'')}</div></div>
+      ${idea.novelty_rationale ? `<div class="idea-field"><div class="idea-field-label">Novelty Filter</div><div class="idea-field-text">${esc(idea.novelty_rationale||'')}</div></div>` : ''}
       <div class="idea-tags">${(idea.related_methods||[]).map(m=>`<span class="idea-tag">${esc(m)}</span>`).join('')}<span class="idea-tag">${esc(idea.gap_type||'')}</span></div>
       <div class="idea-scores">
         <div class="idea-score"><span class="label">新颖性 </span><span class="value">${idea.novelty_score||'?'}/10</span></div>
@@ -355,6 +389,7 @@ function loadHistory() {
         </div>
         <div class="history-actions">
           <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();viewHistory('${r.id}')">查看</button>
+          <a class="btn btn-sm btn-outline" href="/output/${r.id}/report.md" target="_blank" onclick="event.stopPropagation()">导出</a>
           <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteHistory('${r.id}')">删除</button>
         </div>
       </div>`).join('');
@@ -374,6 +409,44 @@ function viewHistory(runId) {
 function deleteHistory(runId) {
   if (!confirm('确定删除这条记录？')) return;
   fetch('/api/history/'+runId, {method:'DELETE'}).then(r=>r.json()).then(() => loadHistory());
+}
+
+function exportPapersCsv() {
+  const papers = (currentResult && currentResult.papers) || [];
+  if (!papers.length) {
+    alert('当前没有可导出的论文列表');
+    return;
+  }
+
+  const rows = [
+    ['title', 'year', 'authors', 'key_method', 'venue', 'citations_approx', 'url', 'verification_source', 'abstract'],
+    ...papers.map(p => [
+      p.title || '',
+      p.year || '',
+      p.authors || '',
+      p.key_method || '',
+      p.venue || '',
+      p.citations_approx || 0,
+      p.url || '',
+      p.verification_source || '',
+      p.abstract || '',
+    ]),
+  ];
+
+  const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${(currentResult && currentResult.run_id) || 'papers'}_papers.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
 
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }

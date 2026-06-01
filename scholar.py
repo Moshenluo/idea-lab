@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import time
 import requests
+from difflib import SequenceMatcher
 from typing import Optional
 from config import S2_API_BASE, S2_API_KEY
 
@@ -42,7 +43,7 @@ def search_papers(query: str, limit: int = 20, year_range: tuple = None) -> list
     params = {
         "query": query,
         "limit": min(limit, 100),
-        "fields": "paperId,title,year,citationCount,authors,abstract,externalIds,references,citations"
+        "fields": "paperId,title,year,citationCount,authors,abstract,externalIds,url,venue,publicationVenue"
     }
     if year_range:
         params["year"] = f"{year_range[0]}-{year_range[1]}"
@@ -82,13 +83,45 @@ def get_paper_citations(paper_id: str, limit: int = 50) -> list:
     return [c["citingPaper"] for c in data["data"] if c.get("citingPaper", {}).get("paperId")]
 
 
+def search_paper_by_title(title: str, limit: int = 5) -> Optional[dict]:
+    """按标题搜索单篇论文，返回最匹配结果。"""
+    params = {
+        "query": title,
+        "limit": min(limit, 10),
+        "fields": "paperId,title,year,citationCount,authors,abstract,externalIds,url,venue,publicationVenue"
+    }
+    data = _get(f"{S2_API_BASE}/paper/search", params)
+    if not data or "data" not in data:
+        return None
+
+    def _norm(text: str) -> str:
+        return "".join(ch.lower() for ch in text if ch.isalnum())
+
+    target = _norm(title)
+    best = None
+    best_score = 0.0
+    for paper in data["data"]:
+        candidate = _norm(paper.get("title", ""))
+        score = 0.0
+        if candidate == target:
+            score = 1.0
+        elif target and candidate:
+            score = SequenceMatcher(None, target, candidate).ratio()
+            if target in candidate or candidate in target:
+                score = max(score, 0.92)
+        if score > best_score:
+            best = paper
+            best_score = score
+
+    if best_score < 0.72:
+        return None
+    return best
+
+
 def batch_papers(paper_ids: list, fields: str = None) -> list:
     """批量获取论文"""
     if fields is None:
         fields = "paperId,title,year,citationCount,abstract,authors"
-    data = _get(f"{S2_API_BASE}/paper/batch", {
-        "fields": fields
-    })
     # batch API 用 POST
     import requests as req
     h = _headers()

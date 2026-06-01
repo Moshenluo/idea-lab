@@ -5,6 +5,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import json
+from typing import Dict, List, Union
 from openai import OpenAI
 from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 
@@ -32,7 +33,7 @@ def _chat(system: str, user: str, temperature: float = 0.3) -> str:
     return resp.choices[0].message.content
 
 
-def _parse_json(text: str) -> dict | list:
+def _parse_json(text: str) -> Union[Dict, List]:
     """从 LLM 输出中提取 JSON"""
     # 尝试直接解析
     try:
@@ -125,6 +126,151 @@ def analyze_evolution(paper_a_summary: str, paper_b_summary: str) -> dict:
         return _parse_json(resp)
     except ValueError:
         return {"relation": "unrelated", "confidence": 0}
+
+
+METHOD_LINK_PROMPT = """你是一个严谨的 AI 方法演化标注员。
+给定论文 A（引用方）与论文 B（被引用方）的摘要，以及两篇论文中各自提取出的候选方法名。
+
+你的任务是只标注有明确方法继承/改造关系的方法对。不要因为两篇论文互相相关就连边。
+
+输出 JSON 数组，每个元素:
+[
+  {
+    "source": "论文 B 中被继承/被改造的方法名",
+    "target": "论文 A 中新方法名",
+    "relation": "extends|improves|replaces|adapts|uses_component",
+    "bottleneck": "source 方法的具体瓶颈",
+    "mechanism": "target 如何改进 source",
+    "trade_off": "该改进的主要代价或权衡",
+    "evidence": "支持这条边的简短证据摘要，不超过30字",
+    "confidence": 0.0-1.0
+  }
+]
+
+规则:
+- 只输出在候选方法列表中出现的方法名
+- 如果没有明确的方法级关系，输出空数组 []
+- 优先少而准，不要泛化
+- source 必须来自论文 B，target 必须来自论文 A"""
+
+
+def link_method_evolution(
+    paper_a_summary: str,
+    paper_b_summary: str,
+    methods_a: List[str],
+    methods_b: List[str],
+) -> List[Dict]:
+    """在两个论文的方法集合之间识别具体的演化边。"""
+    user_msg = f"""论文 A (引用方):
+{paper_a_summary}
+
+论文 B (被引用方):
+{paper_b_summary}
+
+论文 A 候选方法:
+{json.dumps(methods_a, ensure_ascii=False)}
+
+论文 B 候选方法:
+{json.dumps(methods_b, ensure_ascii=False)}
+
+请只输出明确成立的方法演化边。"""
+    resp = _chat(METHOD_LINK_PROMPT, user_msg)
+    try:
+        data = _parse_json(resp)
+        return data if isinstance(data, list) else []
+    except ValueError:
+        return []
+
+
+EDGE_EVIDENCE_PROMPT = """你是一个严谨的 AI 科研证据整理员。
+给定一组论文摘要和一组已经建立的方法演化边，请为每条边补充最可信的文本依据与论文出处。
+
+输出 JSON 数组，每个元素:
+[
+  {
+    "source": "源方法名",
+    "target": "目标方法名",
+    "relation": "关系类型",
+    "evidence": "20-40字的中文证据摘要，说明为什么这条边成立",
+    "source_paper_title": "更能代表 source 方法的论文标题",
+    "target_paper_title": "更能代表 target 方法的论文标题"
+  }
+]
+
+规则:
+- 只为输入中已有的边补证据，不要新增边
+- 证据必须来自给定论文摘要内容，不要编造外部事实
+- 如果证据不充分，evidence 留空字符串
+- 标题必须从给定论文中选择"""
+
+
+def enrich_edges_with_papers(papers: List[Dict], edges: List[Dict]) -> List[Dict]:
+    """基于论文摘要为现有演化边补证据与论文出处。"""
+    if not papers or not edges:
+        return edges
+
+    papers_text = "\n".join(
+        f"- 标题: {p.get('title','')}\n  年份: {p.get('year','?')}\n  核心方法: {p.get('key_method','')}\n  摘要: {p.get('abstract','')}"
+        for p in papers[:20]
+    )
+    edge_text = json.dumps(
+        [
+            {
+                "source": e.get("source", ""),
+                "target": e.get("target", ""),
+                "relation": e.get("relation", ""),
+            }
+            for e in edges
+        ],
+        ensure_ascii=False,
+        indent=2,
+    )
+    user_msg = f"""论文列表:
+{papers_text}
+
+已有演化边:
+{edge_text}
+
+请为每条边补充 evidence 与对应论文标题。"""
+    resp = _chat(EDGE_EVIDENCE_PROMPT, user_msg)
+    try:
+        data = _parse_json(resp)
+        if not isinstance(data, list):
+            return edges
+    except ValueError:
+        return edges
+
+    evidence_map = {
+        (item.get("source", ""), item.get("target", ""), item.get("relation", "")): item
+        for item in data
+        if isinstance(item, dict)
+    }
+
+    title_to_id = {
+        (paper.get("title") or "").strip(): paper.get("paper_id", "")
+        for paper in papers
+        if paper.get("title")
+    }
+
+    enriched = []
+    for edge in edges:
+        key = (edge.get("source", ""), edge.get("target", ""), edge.get("relation", ""))
+        patch = evidence_map.get(key, {})
+        merged = dict(edge)
+        source_title = (patch.get("source_paper_title") or "").strip()
+        target_title = (patch.get("target_paper_title") or "").strip()
+        if patch.get("evidence"):
+            merged["evidence"] = patch["evidence"]
+        if source_title:
+            merged["source_paper_titles"] = [source_title]
+            if title_to_id.get(source_title):
+                merged["source_paper_ids"] = [title_to_id[source_title]]
+        if target_title:
+            merged["target_paper_titles"] = [target_title]
+            if title_to_id.get(target_title):
+                merged["target_paper_ids"] = [title_to_id[target_title]]
+        enriched.append(merged)
+    return enriched
 
 
 # ─── Idea 生成 ────────────────────────────────────────────

@@ -33,8 +33,33 @@ RELATION_COLORS = {
 }
 
 
+def _ensure_edge_nodes(methods: list, edges: list) -> list:
+    """补齐被边引用但未出现在 methods 中的节点，避免渲染报错。"""
+    normalized_methods = [dict(m or {}) for m in (methods or [])]
+    existing = {
+        (m.get("name") or "").strip()
+        for m in normalized_methods
+        if (m.get("name") or "").strip()
+    }
+
+    for edge in edges or []:
+        for endpoint in [(edge.get("source") or "").strip(), (edge.get("target") or "").strip()]:
+            if not endpoint or endpoint in existing:
+                continue
+            normalized_methods.append({
+                "name": endpoint,
+                "category": "unknown",
+                "description": "Auto-added from evolution edge because the method node was missing.",
+                "year": "?",
+            })
+            existing.add(endpoint)
+
+    return normalized_methods
+
+
 def generate_graph_html(methods: list, edges: list, output_path: str) -> str:
     """生成交互式 HTML 图谱"""
+    methods = _ensure_edge_nodes(methods, edges)
     if not HAS_PYVIS:
         # fallback: 生成纯 HTML/SVG
         return _generate_svg_graph(methods, edges, output_path)

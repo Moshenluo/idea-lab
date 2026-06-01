@@ -3,19 +3,35 @@ IdeaLab 主流程 — 从搜索到 idea 生成的完整 pipeline
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import json
+import time
 from datetime import datetime
 
 from config import OUTPUT_DIR, MAX_IDEAS, MAX_CITATION_DEPTH
 from graph_builder import CitationGraph
-from analyzer import extract_methods, analyze_evolution, generate_ideas, analyze_bottlenecks
+from analyzer import extract_methods, generate_ideas, analyze_bottlenecks, link_method_evolution
+from method_utils import normalize_method_record, merge_method_records, dedupe_edges
+from idea_utils import annotate_and_rerank_ideas
 
 
 def step(msg: str):
     print(f"\n{'='*60}")
     print(f"  {msg}")
     print(f"{'='*60}")
+
+
+def _ingest_methods(extracted: list, methods: dict, paper_methods: dict, pid: str, graph: CitationGraph):
+    paper_methods[pid] = []
+    for raw_method in extracted:
+        normalized = normalize_method_record(raw_method)
+        name = normalized.get("canonical_name") or normalized.get("name", "unknown")
+        methods[name] = merge_method_records(methods.get(name, {}), normalized)
+        if name not in paper_methods[pid]:
+            paper_methods[pid].append(name)
+        graph.method_graph.add_node(name, **methods[name])
 
 
 def run_pipeline(query: str, limit: int = 20, depth: int = None):
@@ -72,13 +88,7 @@ def run_pipeline(query: str, limit: int = 20, depth: int = None):
         print(f"  [{i+1}/15] 分析: {graph.paper_meta.get(pid, {}).get('title', '?')[:50]}...")
 
         extracted = extract_methods(summary)
-        paper_methods[pid] = []
-        for m in extracted:
-            name = m.get("name", "unknown")
-            methods[name] = m
-            paper_methods[pid].append(name)
-            # 添加到方法图
-            graph.method_graph.add_node(name, **m)
+        _ingest_methods(extracted, methods, paper_methods, pid, graph)
 
         time.sleep(0.5)
 
@@ -97,35 +107,38 @@ def run_pipeline(query: str, limit: int = 20, depth: int = None):
                 # 为被引论文也提取方法
                 summary = graph.get_paper_summary(rid)
                 extracted = extract_methods(summary)
-                paper_methods[rid] = [m.get("name", "unknown") for m in extracted]
-                for m in extracted:
-                    methods[m["name"]] = m
-                    graph.method_graph.add_node(m["name"], **m)
+                _ingest_methods(extracted, methods, paper_methods, rid, graph)
                 time.sleep(0.3)
 
             if not paper_methods.get(pid) or not paper_methods.get(rid):
                 continue
 
-            # 分析演化关系
+            # 分析具体的方法对，而不是把两篇论文的方法做笛卡尔积相连
             a_summary = graph.get_paper_summary(pid)
             b_summary = graph.get_paper_summary(rid)
-            evo = analyze_evolution(a_summary, b_summary)
+            candidate_edges = link_method_evolution(
+                a_summary,
+                b_summary,
+                paper_methods.get(pid, []),
+                paper_methods.get(rid, []),
+            )
 
-            if evo.get("relation") != "unrelated" and evo.get("confidence", 0) > 0.5:
-                for ma in paper_methods[pid]:
-                    for mb in paper_methods[rid]:
-                        graph.method_graph.add_edge(mb, ma, **evo)
-                        evolution_edges.append({
-                            "from": mb, "to": ma,
-                            "relation": evo.get("relation"),
-                            "bottleneck": evo.get("bottleneck", ""),
-                            "mechanism": evo.get("mechanism", ""),
-                        })
-                        print(f"    {mb} --[{evo['relation']}]--> {ma}")
+            for evo in candidate_edges:
+                if evo.get("confidence", 0) < 0.55:
+                    continue
+                evo = dict(evo)
+                evo["source_paper_ids"] = [rid]
+                evo["target_paper_ids"] = [pid]
+                evo["source_paper_titles"] = [graph.paper_meta.get(rid, {}).get("title", "")]
+                evo["target_paper_titles"] = [graph.paper_meta.get(pid, {}).get("title", "")]
+                graph.method_graph.add_edge(evo["source"], evo["target"], **evo)
+                evolution_edges.append(evo)
+                print(f"    {evo['source']} --[{evo['relation']}]--> {evo['target']}")
 
             checked += 1
             time.sleep(0.5)
 
+    evolution_edges = dedupe_edges(evolution_edges)
     print(f"  ✓ 演化边: {len(evolution_edges)} 条")
 
     # 保存方法图
@@ -137,7 +150,7 @@ def run_pipeline(query: str, limit: int = 20, depth: int = None):
     # 构建演化链文本
     chain_text = ""
     for evo in evolution_edges:
-        chain_text += f"- {evo['from']} --[{evo['relation']}]--> {evo['to']}\n"
+        chain_text += f"- {evo['source']} --[{evo['relation']}]--> {evo['target']}\n"
         if evo.get("bottleneck"):
             chain_text += f"  瓶颈: {evo['bottleneck']}\n"
         if evo.get("mechanism"):
@@ -168,7 +181,8 @@ def run_pipeline(query: str, limit: int = 20, depth: int = None):
 
     # 生成 idea
     print("  生成研究 idea 中...")
-    ideas = generate_ideas(context, max_ideas=MAX_IDEAS)
+    ideas = generate_ideas(context, max_ideas=max(MAX_IDEAS * 2, 6))
+    ideas = annotate_and_rerank_ideas(ideas, list(methods.values()), evolution_edges, max_ideas=MAX_IDEAS)
     print(f"  ✓ 生成 {len(ideas)} 个 idea")
 
     # ─── 输出结果 ──────────────────────────────────────────
@@ -176,7 +190,7 @@ def run_pipeline(query: str, limit: int = 20, depth: int = None):
         "query": query,
         "timestamp": timestamp,
         "graph_stats": graph.to_dict(),
-        "methods": methods,
+        "methods": list(methods.values()),
         "evolution_edges": evolution_edges,
         "bottlenecks": bottlenecks,
         "ideas": ideas,
@@ -197,16 +211,24 @@ def run_pipeline(query: str, limit: int = 20, depth: int = None):
         f.write(f"**演化边:** {len(evolution_edges)}\n\n")
 
         f.write(f"## 核心方法\n\n")
-        for name, m in methods.items():
-            f.write(f"- **{name}** ({m.get('category', '?')}, {m.get('novelty', '?')}): {m.get('description', '')}\n")
+        for m in methods.values():
+            f.write(f"- **{m.get('name', '?')}** ({m.get('category', '?')}, {m.get('novelty', '?')}): {m.get('description', '')}\n")
 
         f.write(f"\n## 演化关系\n\n")
         for evo in evolution_edges:
-            f.write(f"- **{evo['from']}** →[{evo['relation']}]→ **{evo['to']}**\n")
+            f.write(f"- **{evo['source']}** →[{evo['relation']}]→ **{evo['target']}**\n")
             if evo.get("bottleneck"):
                 f.write(f"  - 瓶颈: {evo['bottleneck']}\n")
             if evo.get("mechanism"):
                 f.write(f"  - 机制: {evo['mechanism']}\n")
+            if evo.get("trade_off"):
+                f.write(f"  - 权衡: {evo['trade_off']}\n")
+            if evo.get("evidence"):
+                f.write(f"  - 证据: {evo['evidence']}\n")
+            if evo.get("source_paper_titles") or evo.get("target_paper_titles"):
+                src_titles = ", ".join(evo.get("source_paper_titles", [])[:2])
+                tgt_titles = ", ".join(evo.get("target_paper_titles", [])[:2])
+                f.write(f"  - 论文依据: {src_titles} -> {tgt_titles}\n")
 
         if bottlenecks:
             f.write(f"\n## 已识别瓶颈\n\n")
@@ -225,6 +247,8 @@ def run_pipeline(query: str, limit: int = 20, depth: int = None):
             f.write(f"**预期贡献:** {idea.get('expected_contribution', '')}\n\n")
             f.write(f"**相关方法:** {', '.join(idea.get('related_methods', []))}\n\n")
             f.write(f"**Gap 类型:** {idea.get('gap_type', '')} | **新颖性:** {idea.get('novelty_score', '?')}/10 | **可行性:** {idea.get('feasibility_score', '?')}/10\n\n")
+            if idea.get("novelty_rationale"):
+                f.write(f"**Novelty Filter:** {idea.get('novelty_rationale', '')}\n\n")
             f.write(f"---\n\n")
 
     print(f"\n{'='*60}")

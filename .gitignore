@@ -2,6 +2,11 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+.streamlit/secrets.toml
+streamlit.log
+streamlit.err.log
+server.log
+server.err.log
 output/
 *.egg-info/
 dist/

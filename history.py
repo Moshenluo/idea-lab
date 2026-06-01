@@ -28,7 +28,6 @@ def list_runs(limit: int = 20) -> list:
                     "num_methods": len(data.get("methods", [])),
                     "num_edges": len(data.get("evolution_edges", [])),
                     "num_ideas": len(data.get("ideas", [])),
-                    "has_graph": os.path.exists(os.path.join(d, "graph.html")),
                 })
             except Exception:
                 pass
@@ -43,7 +42,11 @@ def get_run(run_id: str) -> dict:
     result_file = os.path.join(run_dir, "result.json")
     if os.path.exists(result_file):
         with open(result_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        if os.path.exists(os.path.join(run_dir, "report.md")):
+            data["report_url"] = f"/output/{run_id}/report.md"
+        data["result_url"] = f"/output/{run_id}/result.json"
+        return data
     return None
 
 
@@ -51,13 +54,6 @@ def get_report_path(run_id: str) -> str:
     """获取报告文件路径"""
     path = os.path.join(OUTPUT_DIR, run_id, "report.md")
     return path if os.path.exists(path) else None
-
-
-def get_graph_path(run_id: str) -> str:
-    """获取图谱文件路径"""
-    path = os.path.join(OUTPUT_DIR, run_id, "graph.html")
-    return path if os.path.exists(path) else None
-
 
 def delete_run(run_id: str) -> bool:
     """删除某次运行"""

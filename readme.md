@@ -6,6 +6,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![Flask](https://img.shields.io/badge/Flask-3.x-green)
+![Streamlit](https://img.shields.io/badge/Streamlit-ready-red)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## ✨ 功能
@@ -43,7 +44,7 @@
 ### 1. 安装依赖
 
 ```bash
-pip install flask networkx requests openai
+pip install -r requirements.txt
 ```
 
 ### 2. 设置 API Key
@@ -58,13 +59,33 @@ export DEEPSEEK_API_KEY="sk-your-key-here"
 
 ### 3. 启动 Web 界面
 
+Streamlit（推荐部署方式）：
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Flask 版本：
+
 ```bash
 python server.py
 ```
 
-然后打开浏览器访问 **http://localhost:5000**
+然后按终端提示打开本地地址。Flask 默认访问 **http://localhost:5000**。
 
-### 4. 或者用命令行
+### 4. 部署到 Streamlit Community Cloud
+
+1. 将项目推送到 GitHub。
+2. 在 Streamlit Community Cloud 新建 App。
+3. Main file path 填写 `streamlit_app.py`。
+4. 在 App settings → Secrets 中添加：
+
+```toml
+DEEPSEEK_API_KEY = "sk-your-key-here"
+S2_API_KEY = ""
+```
+
+### 5. 或者用命令行
 
 ```bash
 # 快速模式（推荐，纯 DeepSeek 驱动）
@@ -79,6 +100,9 @@ python main.py "your research topic"
 ```
 idea-lab/
 ├── server.py          # Web 服务器 (Flask)
+├── streamlit_app.py   # Streamlit 部署入口
+├── requirements.txt   # Python 依赖
+├── .streamlit/        # Streamlit 配置与 secrets 示例
 ├── templates/
 │   └── index.html     # 前端界面
 ├── fast.py            # 快速模式 pipeline（纯 LLM）
