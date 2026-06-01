@@ -119,7 +119,12 @@ def _fill_urls(papers: list, progress_callback=None) -> list:
     return papers
 
 
-def deepseek_search_papers(query: str, n: int = 15, progress_callback=None) -> list:
+def deepseek_search_papers(
+    query: str,
+    n: int = 15,
+    progress_callback=None,
+    fill_missing_urls: bool = True,
+) -> list:
     """用 DeepSeek 召回候选论文，再由 Semantic Scholar 校验。"""
     _notify_progress(progress_callback, "recall_start", 0, 1, "正在调用模型召回候选论文...")
     prompt = f"""你是一个 AI 学术搜索专家。
@@ -154,6 +159,9 @@ def deepseek_search_papers(query: str, n: int = 15, progress_callback=None) -> l
         return []
     _notify_progress(progress_callback, "recall", 1, 1, f"模型召回到 {len(candidates)} 篇候选论文")
     verified = _verify_papers(candidates, progress_callback=progress_callback)
+    if not fill_missing_urls:
+        _notify_progress(progress_callback, "url_skipped", 1, 1, "已跳过二次链接补全，加快生成")
+        return verified
     return _fill_urls(verified, progress_callback=progress_callback)
 
 

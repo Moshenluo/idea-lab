@@ -7,6 +7,7 @@ existing research pipeline modules.
 from __future__ import annotations
 
 import json
+import html
 import os
 import tempfile
 import time
@@ -17,10 +18,34 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 
+st.set_page_config(
+    page_title="IdeaLab",
+    page_icon="🔬",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+
 def _bootstrap_secrets() -> None:
     """Expose Streamlit secrets as environment variables before local imports."""
+    dotenv_values: Dict[str, str] = {}
+    dotenv_path = Path(__file__).with_name(".env")
+    if dotenv_path.exists():
+        with open(dotenv_path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                dotenv_values[key.strip()] = value.strip().strip('"').strip("'")
+
     for key in ("DEEPSEEK_API_KEY", "S2_API_KEY"):
         if os.environ.get(key):
+            continue
+        if dotenv_values.get(key):
+            os.environ[key] = dotenv_values[key]
+            continue
+        if key == "S2_API_KEY":
             continue
         try:
             value = st.secrets.get(key, "")
@@ -41,12 +66,81 @@ from method_utils import dedupe_edges, normalize_methods_list  # noqa: E402
 from visualizer import generate_graph_html  # noqa: E402
 
 
-st.set_page_config(
-    page_title="IdeaLab",
-    page_icon="🔬",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+def _inject_styles() -> None:
+    """Tight Streamlit-specific polish for a denser research dashboard."""
+    st.markdown(
+        """
+        <style>
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.35rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+            padding-bottom: 0.3rem;
+        }
+        .stTabs [data-baseweb="tab"] {
+            min-height: 2.85rem;
+            padding: 0.65rem 1.05rem;
+            border-radius: 0.45rem 0.45rem 0 0;
+            font-size: 1.02rem;
+            font-weight: 700;
+        }
+        .stTabs [aria-selected="true"] {
+            background: rgba(99, 102, 241, 0.16);
+            border-bottom: 2px solid #818cf8;
+        }
+        .stButton > button,
+        .stDownloadButton > button,
+        div[data-testid="stFormSubmitButton"] button {
+            min-height: 2.85rem;
+            font-weight: 700;
+            border-radius: 0.45rem;
+        }
+        div[data-testid="stMetric"] {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 0.45rem;
+            padding: 0.65rem 0.8rem;
+            background: rgba(15, 23, 42, 0.32);
+        }
+        .idea-card {
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 0.5rem;
+            padding: 1rem 1.1rem;
+            margin: 0.85rem 0 1rem;
+            background: rgba(15, 23, 42, 0.28);
+        }
+        .idea-card h3 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            font-size: 1.18rem;
+            line-height: 1.35;
+        }
+        .idea-chip {
+            display: inline-block;
+            margin: 0 0.35rem 0.4rem 0;
+            padding: 0.18rem 0.5rem;
+            border: 1px solid rgba(129, 140, 248, 0.42);
+            border-radius: 999px;
+            color: #c7d2fe;
+            font-size: 0.82rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+_inject_styles()
+
+
+def _as_text(value: Any) -> str:
+    if isinstance(value, list):
+        return "；".join(str(item) for item in value if item)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _html(value: Any) -> str:
+    return html.escape(_as_text(value), quote=True)
 
 
 def _write_report(run_dir: str, result: Dict[str, Any]) -> str:
@@ -99,6 +193,11 @@ def _write_report(run_dir: str, result: Dict[str, Any]) -> str:
             f.write(f"**动机:** {idea.get('motivation', '')}\n\n")
             f.write(f"**方法:** {idea.get('approach', '')}\n\n")
             f.write(f"**预期贡献:** {idea.get('expected_contribution', '')}\n\n")
+            f.write(f"**局限性:** {_as_text(idea.get('limitations')) or '未生成'}\n\n")
+            f.write(f"**主要风险:** {_as_text(idea.get('risks')) or '未生成'}\n\n")
+            f.write(f"**验证方案:** {_as_text(idea.get('validation_plan')) or '未生成'}\n\n")
+            if idea.get("required_resources"):
+                f.write(f"**资源需求:** {_as_text(idea.get('required_resources'))}\n\n")
             f.write(f"**相关方法:** {', '.join(idea.get('related_methods', []))}\n\n")
             f.write(
                 f"**Gap 类型:** {idea.get('gap_type', '')} | "
@@ -111,7 +210,7 @@ def _write_report(run_dir: str, result: Dict[str, Any]) -> str:
     return path
 
 
-def _run_pipeline(query: str, paper_count: int) -> Dict[str, Any]:
+def _run_pipeline(query: str, paper_count: int, fill_missing_urls: bool) -> Dict[str, Any]:
     progress = st.progress(0)
     status = st.empty()
 
@@ -130,10 +229,17 @@ def _run_pipeline(query: str, paper_count: int) -> Dict[str, Any]:
             pct = 14 + int(12 * current / total)
         elif stage == "url":
             pct = 26 + int(14 * current / total)
+        elif stage == "url_skipped":
+            pct = 40
         update(info.get("message") or "正在检索论文...", pct)
 
     update("正在召回并校验论文...", 8)
-    papers = deepseek_search_papers(query, n=paper_count, progress_callback=on_search_progress)
+    papers = deepseek_search_papers(
+        query,
+        n=paper_count,
+        progress_callback=on_search_progress,
+        fill_missing_urls=fill_missing_urls,
+    )
 
     update("正在构建方法演化图谱...", 42)
     graph_data = deepseek_build_evolution(papers)
@@ -253,18 +359,33 @@ def _render_result(result: Dict[str, Any]) -> None:
 
     with tab_ideas:
         for index, idea in enumerate(result.get("ideas", []), 1):
-            st.markdown(f"### {index}. {idea.get('title', '')}")
-            st.write(f"**动机:** {idea.get('motivation', '')}")
-            st.write(f"**方法:** {idea.get('approach', '')}")
-            st.write(f"**预期贡献:** {idea.get('expected_contribution', '')}")
-            st.caption(
-                f"Gap: {idea.get('gap_type', '')} | "
-                f"新颖性 {idea.get('novelty_score', '?')}/10 | "
-                f"可行性 {idea.get('feasibility_score', '?')}/10"
+            related_chips = "".join(
+                f'<span class="idea-chip">{_html(method)}</span>'
+                for method in idea.get("related_methods", [])
+            )
+            st.markdown(
+                f"""
+                <div class="idea-card">
+                    <h3>{index}. {_html(idea.get('title', ''))}</h3>
+                    <div>
+                        <span class="idea-chip">Gap: {_html(idea.get('gap_type', ''))}</span>
+                        <span class="idea-chip">新颖性 {_html(idea.get('novelty_score', '?'))}/10</span>
+                        <span class="idea-chip">可行性 {_html(idea.get('feasibility_score', '?'))}/10</span>
+                    </div>
+                    <p><strong>动机：</strong>{_html(idea.get('motivation', ''))}</p>
+                    <p><strong>方法：</strong>{_html(idea.get('approach', ''))}</p>
+                    <p><strong>预期贡献：</strong>{_html(idea.get('expected_contribution', ''))}</p>
+                    <p><strong>局限性：</strong>{_html(idea.get('limitations') or '未生成')}</p>
+                    <p><strong>主要风险：</strong>{_html(idea.get('risks') or '未生成')}</p>
+                    <p><strong>验证方案：</strong>{_html(idea.get('validation_plan') or '未生成')}</p>
+                    <p><strong>资源需求：</strong>{_html(idea.get('required_resources') or '未生成')}</p>
+                    <p><strong>相关方法：</strong>{related_chips or '未生成'}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
             if idea.get("novelty_rationale"):
                 st.caption(f"Novelty Filter: {idea.get('novelty_rationale', '')}")
-            st.divider()
         if not result.get("ideas"):
             st.info("暂无研究 Idea。")
 
@@ -296,8 +417,16 @@ st.caption("基于论文方法演化图谱的 AI 研究 Idea 生成器")
 with st.sidebar:
     st.header("配置")
     key_ready = bool(os.environ.get("DEEPSEEK_API_KEY"))
-    st.success("DeepSeek API Key 已配置") if key_ready else st.warning("请在 Streamlit secrets 中配置 DEEPSEEK_API_KEY")
-    paper_count = st.slider("候选论文数", 8, 20, 15, 1)
+    if key_ready:
+        st.success("DeepSeek API Key 已配置")
+    else:
+        st.warning("请在 Streamlit secrets 中配置 DEEPSEEK_API_KEY")
+    paper_count = st.slider("候选论文数", 6, 20, 12, 1)
+    speed_first = st.checkbox(
+        "速度优先：跳过二次链接补全",
+        value=True,
+        help="保留论文校验，但跳过额外 URL 查询，通常能更快出结果。",
+    )
 
     st.header("历史运行")
     runs = list_runs(limit=20)
@@ -321,7 +450,7 @@ if submitted:
         st.error("请输入研究方向。")
     else:
         try:
-            st.session_state["result"] = _run_pipeline(query.strip(), paper_count)
+            st.session_state["result"] = _run_pipeline(query.strip(), paper_count, fill_missing_urls=not speed_first)
             st.rerun()
         except Exception as exc:
             st.error(f"生成失败：{exc}")

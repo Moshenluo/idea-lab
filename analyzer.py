@@ -289,6 +289,10 @@ IDEA_PROMPT = """你是一个 AI 研究创意专家。
   "motivation": "为什么这个方向值得探索 (基于图谱中的哪个瓶颈/空白)",
   "approach": "拟采用的方法 (简要技术路线)",
   "expected_contribution": "预期贡献",
+  "limitations": "该 idea 的局限性，说明边界条件与不适用场景",
+  "risks": "主要技术风险、数据风险或评估风险",
+  "validation_plan": "如何验证，包括数据集、baseline、指标或消融实验",
+  "required_resources": "需要的数据、算力、标注或工程资源",
   "related_methods": ["涉及的方法名"],
   "gap_type": "bottleneck_resolution | trend_extrapolation | cross_pollination | paradigm_challenge",
   "novelty_score": 1-10,
@@ -306,7 +310,9 @@ def generate_ideas(graph_context: str, max_ideas: int = 5) -> list:
 1. 被反复提及但未解决的瓶颈
 2. 有明显演化趋势但尚未到达的方向
 3. 两个方法线之间缺失的桥梁
-4. 被主流忽视但有潜力的替代路径"""
+4. 被主流忽视但有潜力的替代路径
+
+每个 idea 必须同时给出局限性、主要风险、验证方案和资源需求，避免只写优点。"""
     resp = _chat(IDEA_PROMPT, user_msg, temperature=0.7)
     try:
         return _parse_json(resp)
