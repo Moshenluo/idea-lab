@@ -100,6 +100,42 @@ def _inject_styles() -> None:
             padding: 0.65rem 0.8rem;
             background: rgba(15, 23, 42, 0.32);
         }
+        div[data-testid="stDataFrame"] div[role="toolbar"],
+        div[data-testid="stDataFrame"] [data-testid*="Toolbar"],
+        div[data-testid="stDataFrame"] [class*="toolbar"] {
+            gap: 0.32rem !important;
+            padding: 0.28rem !important;
+            border-radius: 0.5rem !important;
+            background: rgba(15, 23, 42, 0.78) !important;
+            border: 1px solid rgba(148, 163, 184, 0.22) !important;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+        }
+        div[data-testid="stDataFrame"] div[role="toolbar"] button,
+        div[data-testid="stDataFrame"] [data-testid*="Toolbar"] button,
+        div[data-testid="stDataFrame"] [class*="toolbar"] button {
+            width: 2.15rem !important;
+            height: 2.15rem !important;
+            min-width: 2.15rem !important;
+            min-height: 2.15rem !important;
+            border-radius: 0.42rem !important;
+            color: #e2e8f0 !important;
+            background: rgba(30, 41, 59, 0.72) !important;
+            border: 1px solid rgba(148, 163, 184, 0.18) !important;
+        }
+        div[data-testid="stDataFrame"] div[role="toolbar"] button:hover,
+        div[data-testid="stDataFrame"] [data-testid*="Toolbar"] button:hover,
+        div[data-testid="stDataFrame"] [class*="toolbar"] button:hover {
+            color: #ffffff !important;
+            background: rgba(79, 70, 229, 0.4) !important;
+            border-color: rgba(129, 140, 248, 0.55) !important;
+        }
+        div[data-testid="stDataFrame"] div[role="toolbar"] svg,
+        div[data-testid="stDataFrame"] [data-testid*="Toolbar"] svg,
+        div[data-testid="stDataFrame"] [class*="toolbar"] svg {
+            width: 1.05rem !important;
+            height: 1.05rem !important;
+            stroke-width: 2.2px !important;
+        }
         .idea-card {
             border: 1px solid rgba(148, 163, 184, 0.2);
             border-radius: 0.5rem;
