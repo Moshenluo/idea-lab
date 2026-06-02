@@ -45,7 +45,7 @@ def _bootstrap_secrets() -> None:
         if dotenv_values.get(key):
             os.environ[key] = dotenv_values[key]
             continue
-        if key == "S2_API_KEY":
+        if key == "S2_API_KEY" and dotenv_path.exists():
             continue
         try:
             value = st.secrets.get(key, "")
@@ -107,6 +107,29 @@ def _inject_styles() -> None:
             margin: 0.85rem 0 1rem;
             background: rgba(15, 23, 42, 0.28);
         }
+        .paper-card {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 0.5rem;
+            padding: 0.95rem 1rem;
+            margin: 0.75rem 0;
+            background: rgba(2, 6, 23, 0.34);
+        }
+        .paper-title {
+            font-size: 1rem;
+            font-weight: 750;
+            line-height: 1.35;
+            margin-bottom: 0.45rem;
+        }
+        .paper-meta {
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            margin-bottom: 0.45rem;
+        }
+        .paper-abstract {
+            color: #dbeafe;
+            line-height: 1.55;
+            margin-top: 0.55rem;
+        }
         .idea-card h3 {
             margin-top: 0;
             margin-bottom: 0.5rem;
@@ -121,6 +144,15 @@ def _inject_styles() -> None:
             border-radius: 999px;
             color: #c7d2fe;
             font-size: 0.82rem;
+        }
+        .paper-chip {
+            display: inline-block;
+            margin: 0 0.32rem 0.36rem 0;
+            padding: 0.16rem 0.46rem;
+            border: 1px solid rgba(56, 189, 248, 0.36);
+            border-radius: 999px;
+            color: #bae6fd;
+            font-size: 0.8rem;
         }
         </style>
         """,
@@ -141,6 +173,13 @@ def _as_text(value: Any) -> str:
 
 def _html(value: Any) -> str:
     return html.escape(_as_text(value), quote=True)
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _write_report(run_dir: str, result: Dict[str, Any]) -> str:
@@ -299,6 +338,99 @@ def _download_button(label: str, path: str, mime: str) -> None:
         st.download_button(label, f, file_name=os.path.basename(path), mime=mime, use_container_width=True)
 
 
+def _paper_table_rows(papers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    rows = []
+    for index, paper in enumerate(papers, 1):
+        rows.append(
+            {
+                "#": index,
+                "year": _as_int(paper.get("year"), 0),
+                "title": paper.get("title", ""),
+                "method": paper.get("key_method", ""),
+                "venue": paper.get("venue", ""),
+                "citations": _as_int(paper.get("citations_approx"), 0),
+                "source": paper.get("verification_source", "") or "unknown",
+                "link": paper.get("url", ""),
+            }
+        )
+    return rows
+
+
+def _render_papers_tab(papers: List[Dict[str, Any]]) -> None:
+    if not papers:
+        st.info("暂无论文数据。")
+        return
+
+    sources = sorted({(paper.get("verification_source") or "unknown") for paper in papers})
+    col_filter, col_source, col_sort = st.columns([2.3, 1.15, 1.2])
+    keyword = col_filter.text_input("筛选论文", placeholder="标题、方法、venue 或摘要关键词")
+    source_choice = col_source.selectbox("来源", ["全部"] + sources)
+    sort_choice = col_sort.selectbox("排序", ["召回顺序", "年份新到旧", "年份旧到新", "引用数高到低"])
+
+    filtered = []
+    keyword_norm = keyword.strip().lower()
+    for paper in papers:
+        if source_choice != "全部" and (paper.get("verification_source") or "unknown") != source_choice:
+            continue
+        haystack = " ".join(
+            str(paper.get(field, ""))
+            for field in ["title", "key_method", "venue", "abstract", "authors"]
+        ).lower()
+        if keyword_norm and keyword_norm not in haystack:
+            continue
+        filtered.append(paper)
+
+    if sort_choice == "年份新到旧":
+        filtered.sort(key=lambda item: _as_int(item.get("year"), 0), reverse=True)
+    elif sort_choice == "年份旧到新":
+        filtered.sort(key=lambda item: _as_int(item.get("year"), 0))
+    elif sort_choice == "引用数高到低":
+        filtered.sort(key=lambda item: _as_int(item.get("citations_approx"), 0), reverse=True)
+
+    st.caption(f"显示 {len(filtered)} / {len(papers)} 篇论文")
+    st.dataframe(
+        _paper_table_rows(filtered),
+        use_container_width=True,
+        hide_index=True,
+        height=min(520, 92 + max(len(filtered), 1) * 36),
+        column_order=["#", "year", "title", "method", "venue", "citations", "source", "link"],
+        column_config={
+            "#": st.column_config.NumberColumn("#", width="small"),
+            "year": st.column_config.NumberColumn("年份", width="small"),
+            "title": st.column_config.TextColumn("论文标题", width="large"),
+            "method": st.column_config.TextColumn("核心方法", width="medium"),
+            "venue": st.column_config.TextColumn("Venue", width="small"),
+            "citations": st.column_config.NumberColumn("引用", width="small"),
+            "source": st.column_config.TextColumn("校验来源", width="small"),
+            "link": st.column_config.LinkColumn("链接", display_text="打开", width="small"),
+        },
+    )
+
+    st.markdown("#### 论文摘要与证据")
+    for index, paper in enumerate(filtered, 1):
+        title = paper.get("title", "") or "Untitled paper"
+        with st.expander(f"{index}. [{paper.get('year', '?')}] {title}"):
+            url = paper.get("url", "")
+            link_html = f'<a href="{_html(url)}" target="_blank">打开论文链接</a>' if url else "暂无链接"
+            st.markdown(
+                f"""
+                <div class="paper-card">
+                    <div class="paper-title">{_html(title)}</div>
+                    <div class="paper-meta">
+                        {_html(paper.get('authors') or '作者未知')} ·
+                        {_html(paper.get('venue') or 'Venue 未知')} ·
+                        引用 {_html(paper.get('citations_approx', 0))}
+                    </div>
+                    <span class="paper-chip">方法：{_html(paper.get('key_method') or '未标注')}</span>
+                    <span class="paper-chip">来源：{_html(paper.get('verification_source') or 'unknown')}</span>
+                    <span class="paper-chip">{link_html}</span>
+                    <div class="paper-abstract">{_html(paper.get('abstract') or '暂无摘要。')}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
 def _render_graph(methods: List[Dict[str, Any]], edges: List[Dict[str, Any]]) -> None:
     if not methods and not edges:
         st.info("暂无可视化图谱数据。")
@@ -324,30 +456,25 @@ def _render_result(result: Dict[str, Any]) -> None:
 
     with tab_papers:
         papers = result.get("papers", [])
-        if papers:
-            st.dataframe(
-                [
-                    {
-                        "year": p.get("year", ""),
-                        "title": p.get("title", ""),
-                        "key_method": p.get("key_method", ""),
-                        "venue": p.get("venue", ""),
-                        "citations": p.get("citations_approx", 0),
-                        "source": p.get("verification_source", ""),
-                        "url": p.get("url", ""),
-                    }
-                    for p in papers
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("暂无论文数据。")
+        _render_papers_tab(papers)
 
     with tab_methods:
         methods = result.get("methods", [])
         if methods:
-            st.dataframe(methods, use_container_width=True, hide_index=True)
+            st.dataframe(
+                methods,
+                use_container_width=True,
+                hide_index=True,
+                height=min(520, 90 + max(len(methods), 1) * 38),
+                column_config={
+                    "name": st.column_config.TextColumn("方法", width="medium"),
+                    "canonical_name": st.column_config.TextColumn("标准名", width="medium"),
+                    "category": st.column_config.TextColumn("类别", width="small"),
+                    "description": st.column_config.TextColumn("描述", width="large"),
+                    "first_paper": st.column_config.TextColumn("首次论文", width="large"),
+                    "year": st.column_config.NumberColumn("年份", width="small"),
+                },
+            )
         else:
             st.info("暂无方法实体。")
 
@@ -427,7 +554,7 @@ with st.sidebar:
         st.success("DeepSeek API Key 已配置")
     else:
         st.warning("请在 Streamlit secrets 中配置 DEEPSEEK_API_KEY")
-    paper_count = st.slider("候选论文数", 6, 20, 12, 1)
+    paper_count = st.slider("候选论文数", 6, 50, 18, 1)
     speed_first = st.checkbox(
         "速度优先：跳过二次链接补全",
         value=True,

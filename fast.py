@@ -128,7 +128,7 @@ def deepseek_search_papers(
     """用 DeepSeek 召回候选论文，再由 Semantic Scholar 校验。"""
     _notify_progress(progress_callback, "recall_start", 0, 1, "正在调用模型召回候选论文...")
     prompt = f"""你是一个 AI 学术搜索专家。
-针对以下研究方向，列出 {n} 篇最重要、最有代表性的论文（2017-2025年）。
+针对以下研究方向，列出 {n} 篇最重要、最有代表性的论文（2017-2026年）。
 
 研究方向: {query}
 
