@@ -11,5 +11,14 @@ jobs:
     steps:
       - name: Ping Streamlit app
         run: |
-          curl -L --fail --retry 3 --retry-delay 10 --max-time 60 \
-            "https://idea-lab-moshenluo.streamlit.app/"
+          set -euo pipefail
+          APP_URL="https://idea-lab-moshenluo.streamlit.app/"
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --retry 3 --retry-delay 10 --max-time 60 \
+            -A "Mozilla/5.0 (compatible; keep-streamlit-awake/1.0)" \
+            "$APP_URL")
+          echo "Ping status: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 400 ]; then
+            echo "Unexpected status from $APP_URL"
+            exit 1
+          fi
