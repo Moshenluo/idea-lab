@@ -18,6 +18,9 @@ jobs:
             -A "Mozilla/5.0 (compatible; keep-streamlit-awake/1.0)" \
             "$APP_URL")
           echo "Ping status: $STATUS"
+          if [ "$STATUS" -ge 300 ] && [ "$STATUS" -lt 400 ]; then
+            echo "::warning::App returned a redirect. If this points to Streamlit auth, make the app public for keep-awake pings to reach the app runtime."
+          fi
           if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 400 ]; then
             echo "Unexpected status from $APP_URL"
             exit 1
